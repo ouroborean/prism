@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Union
+from typing import Tuple
 import os
 import threading
 import gc
@@ -74,24 +74,33 @@ class OverworldScene(engine.Scene):
                                self.player_y * 40)
 
     def pressed_left(self):
-        self.player_x -= 1
         direction = (-1, 0)
+        if self.direction_walkable(direction):
+            self.player_x -= 1
         self.full_render()
     
     def pressed_right(self):
-        self.player_x += 1
         direction = (1, 0)
+        if self.direction_walkable(direction):
+            self.player_x += 1
         self.full_render()
 
     def pressed_up(self):
-        self.player_y -= 1
         direction = (0, -1)
+        if self.direction_walkable(direction):
+            self.player_y -= 1
         self.full_render()
     
     def pressed_down(self):
-        self.player_y += 1
         direction = (0, 1)
+        if self.direction_walkable(direction):
+            self.player_y += 1
         self.full_render()
+
+    def direction_walkable(self, direction: Tuple[int, int]) -> bool:
+        destination_square = ( (self.player_x + direction[0]), (self.player_y + direction[1]) )
+        return self.current_map[destination_square].walkable
+
 
 def make_overworld_scene(scene_manager) -> OverworldScene:
     scene = OverworldScene(scene_manager, sdl2.ext.SOFTWARE)

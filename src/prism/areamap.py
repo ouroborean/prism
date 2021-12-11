@@ -11,8 +11,8 @@ class AreaMap:
         self.map = []
         for row in map:
             map_row = []
-            for id in row:
-                map_row.append(Tile(tile_image_db[id]))
+            for info in row:
+                map_row.append(Tile(*tile_image_db[info]))
             self.map.append(map_row)
         self.width = len(self.map[0])
         self.height = len(self.map)
@@ -22,9 +22,10 @@ class AreaMap:
 
 
 test_map = AreaMap([
-    [0, 0, 0, 0, 0],
-    [0, 2, 2, 0, 0],
-    [0, 2, 2, 0, 1],
-    [0, 0, 0, 1, 1],
-    [0, 0, 1, 1, 1]
+    [2, 2, 2, 2, 2, 2],
+    [2, 0, 0, 0, 0, 2],
+    [2, 0, 2, 2, 0, 2],
+    [2, 0, 2, 0, 0, 2],
+    [2, 0, 0, 0, 0, 2],
+    [2, 2, 2, 2, 2, 2]
 ])

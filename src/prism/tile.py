@@ -16,14 +16,16 @@ def get_image_from_path(file_name: str) -> Image:
 class Tile:
     id : int
     image: Image
+    walkable: bool
 
-    def __init__(self, image: Image):
+    def __init__(self, image: Image, walkable=True):
         self.image = get_image_from_path(image)
         self.id = id
+        self.walkable = walkable
 
 tile_image_db = {
 
-    0: "test_grass_tile.png",
-    1: "test_water_tile.png",
-    2: "test_rock_tile.png"
+    0: ("test_grass_tile.png",),
+    1: ("test_water_tile.png", False),
+    2: ("test_rock_tile.png", False),
 }
