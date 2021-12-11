@@ -72,6 +72,10 @@ class Scene:
     def eventables(self) -> Iterator[sdl2.ext.Sprite]:
         return self.region.eventables()
 
+    def dispatch_key_event(self, event: int):
+        if event in self.key_events:
+            self.key_events[event]()
+
     def get_scaled_surface(self, img, width: int = 0, height: int = 0, flipped=False) -> sdl2.SDL_Surface:
         image = img
         if width != 0 or height != 0:
