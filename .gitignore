@@ -6,6 +6,9 @@ __pycache__/
 # C extensions
 *.so
 
+# .ttf files
+*.ttf
+
 # No pictures so WOTC no get angy
 *.png
 
