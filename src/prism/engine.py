@@ -11,6 +11,7 @@ from typing import MutableMapping
 from typing import Optional
 from typing import Tuple
 from typing import Union
+from typing import Callable
 from PIL import Image
 import sdl2
 import sdl2.ext
@@ -46,8 +47,10 @@ class Scene:
     resource_manager: sdl2.ext.Resources
     triggered_event: bool
     font: None
+    key_events: dict[int, Callable]
 
     def __init__(self, sprite_type: Union[Literal[0], Literal[1]]):
+        self.key_events = {}
         self.animations = []
         self.region = Region()
         self.sprite_factory = sdl2.ext.SpriteFactory(sprite_type, free=False)

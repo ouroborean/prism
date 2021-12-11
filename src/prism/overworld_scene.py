@@ -25,8 +25,10 @@ class OverworldScene(engine.Scene):
     def __init__(self, scene_manager, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+    def pressed_space(self):
+        print("Pressed spacebar!")
 
 def make_overworld_scene(scene_manager) -> OverworldScene:
     scene = OverworldScene(scene_manager, sdl2.ext.SOFTWARE)
-
+    scene.key_events[sdl2.SDLK_SPACE] = scene.pressed_space
     return scene

@@ -35,6 +35,8 @@ class SceneManager:
             self.factory = sdl2.ext.SpriteFactory(sdl2.ext.SOFTWARE, free=False)
             self.spriterenderer = self.factory.create_sprite_render_system(window)
 
+    def dispatch_key_event(self, key_event: int):
+        self.current_scene.key_events[key_event]()
 
     def play_sound(self, file_name: str):
         # with importlib.resources.path('animearena.resources', file_name) as path:
