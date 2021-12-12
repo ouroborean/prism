@@ -49,8 +49,12 @@ async def game_loop(scene_manager: SceneManager, uiprocessor: sdl2.ext.UIProcess
                 running = False
             else:
                 if event.type == sdl2.SDL_KEYDOWN:
-                    scene_manager.dispatch_key_event(event.key.keysym.sym)
-                
+                    scene_manager.dispatch_key_press_event(event.key.keysym.sym)
+                if event.type == sdl2.SDL_KEYUP:
+                    scene_manager.dispatch_key_release_event(event.key.keysym.sym)
+        if scene_manager.current_scene == scene_manager.overworld:
+            scene_manager.current_scene.check_for_player_movement()
+                            
         scene_manager.spriterenderer.render(scene_manager.current_scene.renderables())
         window.refresh()
         done = time.monotonic()

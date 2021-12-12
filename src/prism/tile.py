@@ -17,11 +17,34 @@ class Tile:
     id : int
     image: Image
     walkable: bool
+    grid_x: int
+    grid_y: int
+    x: int
+    y: int
+    dest_x: int
+    dest_y: int
+    x_movement_remaining: int
+    y_movement_remaining: int
 
     def __init__(self, image: Image, walkable=True):
         self.image = get_image_from_path(image)
         self.id = id
         self.walkable = walkable
+        self.y_movement_remaining = 40
+        self.x_movement_remaining = 40
+        
+
+    @property
+    def x(self):
+        if self.dest_x > self.grid_x:
+            return (self.grid_x * 40) + (40 - self.x_movement_remaining)
+        return self.grid_x * 40 - (40 - self.x_movement_remaining)
+    
+    @property
+    def y(self):
+        if self.dest_y > self.grid_y:
+            return (self.grid_y * 40) + (40 - self.y_movement_remaining)
+        return self.grid_y * 40 - (40 - self.y_movement_remaining)
 
 tile_image_db = {
 

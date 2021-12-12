@@ -39,8 +39,11 @@ class SceneManager:
         self.surfaces["test_water"] = get_image_from_path("test_water_tile.png")
         self.surfaces["test_rock"] = get_image_from_path("test_rock_tile.png")
 
-    def dispatch_key_event(self, key_event: int):
-        self.current_scene.dispatch_key_event(key_event)
+    def dispatch_key_press_event(self, key_event: int):
+        self.current_scene.dispatch_key_press_event(key_event)
+    
+    def dispatch_key_release_event(self, key_event: int):
+        self.current_scene.dispatch_key_release_event(key_event)
 
     def play_sound(self, file_name: str):
         # with importlib.resources.path('animearena.resources', file_name) as path:

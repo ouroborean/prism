@@ -47,10 +47,12 @@ class Scene:
     resource_manager: sdl2.ext.Resources
     triggered_event: bool
     font: None
-    key_events: dict[int, Callable]
+    key_press_events: dict[int, Callable]
+    key_release_events: dict[int, Callable]
 
     def __init__(self, sprite_type: Union[Literal[0], Literal[1]]):
-        self.key_events = {}
+        self.key_press_events = {}
+        self.key_release_events = {}
         self.animations = []
         self.region = Region()
         self.sprite_factory = sdl2.ext.SpriteFactory(sprite_type, free=False)
@@ -72,9 +74,13 @@ class Scene:
     def eventables(self) -> Iterator[sdl2.ext.Sprite]:
         return self.region.eventables()
 
-    def dispatch_key_event(self, event: int):
-        if event in self.key_events:
-            self.key_events[event]()
+    def dispatch_key_press_event(self, event: int):
+        if event in self.key_press_events:
+            self.key_press_events[event]()
+    
+    def dispatch_key_release_event(self, event: int):
+        if event in self.key_release_events:
+            self.key_release_events[event]()
 
     def get_scaled_surface(self, img, width: int = 0, height: int = 0, flipped=False) -> sdl2.SDL_Surface:
         image = img
