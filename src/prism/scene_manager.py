@@ -6,13 +6,16 @@ import typing
 import importlib.resources
 from PIL import Image
 
+
 def get_image_from_path(file_name: str) -> Image:
     with importlib.resources.path('prism.resources', file_name) as path:
         return Image.open(path)
 
+
 if typing.TYPE_CHECKING:
     from prism.engine import Scene
     from prism.overworld_scene import OverworldScene
+
 
 class SceneManager:
     """Manager for all game scenes"""
@@ -25,6 +28,7 @@ class SceneManager:
     frame_count: int
     current_scene: "Scene"
     overworld: "OverworldScene"
+
     def __init__(self, window: sdl2.ext.Window = None):
         self.frame_count = 0
         self.surfaces = {}
@@ -32,16 +36,20 @@ class SceneManager:
 
         if window:
             self.window = window
-            self.factory = sdl2.ext.SpriteFactory(sdl2.ext.SOFTWARE, free=False)
-            self.spriterenderer = self.factory.create_sprite_render_system(window)
-        
-        self.surfaces["test_grass"] = get_image_from_path("test_grass_tile.png")
-        self.surfaces["test_water"] = get_image_from_path("test_water_tile.png")
+            self.factory = sdl2.ext.SpriteFactory(sdl2.ext.SOFTWARE,
+                                                  free=False)
+            self.spriterenderer = self.factory.create_sprite_render_system(
+                window)
+
+        self.surfaces["test_grass"] = get_image_from_path(
+            "test_grass_tile.png")
+        self.surfaces["test_water"] = get_image_from_path(
+            "test_water_tile.png")
         self.surfaces["test_rock"] = get_image_from_path("test_rock_tile.png")
 
     def dispatch_key_press_event(self, key_event: int):
         self.current_scene.dispatch_key_press_event(key_event)
-    
+
     def dispatch_key_release_event(self, key_event: int):
         self.current_scene.dispatch_key_release_event(key_event)
 
@@ -55,10 +63,12 @@ class SceneManager:
 
     def change_window_size(self, new_width: int, new_height: int):
         sdl2.SDL_SetWindowSize(self.window.window, new_width, new_height)
-        self.spriterenderer = self.factory.create_sprite_render_system(self.window)
+        self.spriterenderer = self.factory.create_sprite_render_system(
+            self.window)
 
     def create_new_window(self, size: Tuple[int, int], name: str):
         self.window.close()
         self.window = sdl2.ext.Window(name, size)
         self.window.show()
-        self.spriterenderer = self.factory.create_sprite_render_system(self.window)
+        self.spriterenderer = self.factory.create_sprite_render_system(
+            self.window)

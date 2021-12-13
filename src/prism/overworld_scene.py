@@ -18,9 +18,9 @@ def get_path(file_name: str) -> Path:
     with importlib.resources.path('prism.resources', file_name) as path:
         return path
 
+
 TILE_SIZE = 40
 BASE_MOVEMENT_SPEED = 5
-
 
 BLUE = sdl2.SDL_Color(0, 0, 255)
 RED = sdl2.SDL_Color(255, 0, 0)
@@ -30,26 +30,32 @@ AQUA = sdl2.SDL_Color(30, 190, 210)
 BLACK = sdl2.SDL_Color(0, 0, 0)
 WHITE = sdl2.SDL_Color(255, 255, 255)
 
+
 def moving_sideways(direction: Tuple[int, int]) -> bool:
     return direction[0] != 0
+
 
 def moving_vertically(direction: Tuple[int, int]) -> bool:
     return direction[1] != 0
 
+
 def moving_left(direction: Tuple[int, int]) -> bool:
     return direction[0] == -1
+
 
 def moving_right(direction: Tuple[int, int]) -> bool:
     return direction[0] == 1
 
+
 def moving_up(direction: Tuple[int, int]) -> bool:
     return direction[1] == -1
+
 
 def moving_down(direction: Tuple[int, int]) -> bool:
     return direction[1] == 1
 
-class DirectionQueue(queue.LifoQueue):
 
+class DirectionQueue(queue.LifoQueue):
     def __init__(self, _maxsize=0):
         self.queue: list = []
         self.set = set()
@@ -58,7 +64,7 @@ class DirectionQueue(queue.LifoQueue):
         if not item in self.set:
             self.set.add(item)
             self.queue.append(item)
-    
+
     def waiting(self):
         return len(self.queue) and len(self.set)
 
@@ -89,11 +95,7 @@ class DirectionQueue(queue.LifoQueue):
             items_to_remain.reverse()
             for q_item in items_to_remain:
                 self.queue.append(q_item)
-        
 
-
-
-    
 
 class OverworldScene(engine.Scene):
 
@@ -160,19 +162,30 @@ class OverworldScene(engine.Scene):
                         if self.reset_direction:
                             self.reset_direction = False
                             resetting = True
-                        if not self.direction_walkable(self.player_direction) or (self.stored_direction.waiting() and not self.direction_walkable(self.stored_direction.peek())):
+                        if not self.direction_walkable(
+                                self.player_direction) or (
+                                    self.stored_direction.waiting()
+                                    and not self.direction_walkable(
+                                        self.stored_direction.peek())):
                             self.player_bonking = True
-                        if self.movement_held and self.player_direction != (0, 0) and (self.direction_walkable(self.player_direction) or self.player_bonking) and not resetting:
+                        if self.movement_held and self.player_direction != (
+                                0, 0) and (
+                                    self.direction_walkable(
+                                        self.player_direction)
+                                    or self.player_bonking) and not resetting:
                             continuing = True
                             done = False
-                        elif self.movement_held and self.stored_direction.waiting() and (self.direction_walkable(self.stored_direction.peek()) or self.player_bonking):
-                            
+                        elif self.movement_held and self.stored_direction.waiting(
+                        ) and (self.direction_walkable(
+                                self.stored_direction.peek())
+                               or self.player_bonking):
                             turning = True
                             continuing = True
                             done = False
                         else:
                             done = True
                             continuing = False
+                            print("Done left/right")
                         tile.x_movement_remaining = 40
                 elif moving_vertically(self.player_direction):
                     if tile.y_movement_remaining > 0:
@@ -183,18 +196,30 @@ class OverworldScene(engine.Scene):
                         if self.reset_direction:
                             self.reset_direction = False
                             resetting = True
-                        if not self.direction_walkable(self.player_direction):
+                        if not self.direction_walkable(
+                                self.player_direction) or (
+                                    self.stored_direction.waiting()
+                                    and not self.direction_walkable(
+                                        self.stored_direction.peek())):
                             self.player_bonking = True
-                        if self.movement_held and self.player_direction != (0, 0) and (self.direction_walkable(self.player_direction) or self.player_bonking) and not resetting:
+                        if self.movement_held and self.player_direction != (
+                                0, 0) and (
+                                    self.direction_walkable(
+                                        self.player_direction)
+                                    or self.player_bonking) and not resetting:
                             continuing = True
                             done = False
-                        elif self.movement_held and self.stored_direction.waiting() and self.direction_walkable(self.stored_direction.peek()):
+                        elif self.movement_held and self.stored_direction.waiting(
+                        ) and (self.direction_walkable(
+                                self.stored_direction.peek())
+                               or self.player_bonking):
                             turning = True
                             continuing = True
                             done = False
                         else:
                             done = True
                             continuing = False
+                            print("Done up/down")
                         tile.y_movement_remaining = 40
             if done:
                 self.player_moving = False
@@ -233,7 +258,8 @@ class OverworldScene(engine.Scene):
                     self.sprite_factory.from_surface(
                         self.get_scaled_surface(self.current_map[(i,
                                                                   j)].image)),
-                    self.current_map[(i, j)].x + self.current_map.start_offset, self.current_map[(i, j)].y + self.current_map.start_offset)
+                    self.current_map[(i, j)].x + self.current_map.start_offset,
+                    self.current_map[(i, j)].y + self.current_map.start_offset)
 
     def render_player(self):
         self.region.add_sprite(self.player_sprite, 240, 240)
@@ -253,14 +279,14 @@ class OverworldScene(engine.Scene):
                 self.player_bonking = True
                 self.player_moving = True
                 self.full_render()
-        if (self.player_moving or self.player_bonking) and self.player_direction != (-1, 0):
+        if (self.player_moving
+                or self.player_bonking) and self.player_direction != (-1, 0):
             self.stored_direction.put((-1, 0))
         self.movement_held = True
         if not self.left_held:
             self.left_held = True
             self.held_movement_keys += 1
-        
-    
+
     def pressed_right(self):
         if not self.player_moving and not self.movement_held:
             self.player_direction = (1, 0)
@@ -275,14 +301,13 @@ class OverworldScene(engine.Scene):
                 self.player_bonking = True
                 self.player_moving = True
                 self.full_render()
-        if (self.player_moving or self.player_bonking) and self.player_direction != (1, 0):
+        if (self.player_moving
+                or self.player_bonking) and self.player_direction != (1, 0):
             self.stored_direction.put((1, 0))
         self.movement_held = True
         if not self.right_held:
             self.right_held = True
             self.held_movement_keys += 1
-
-        
 
     def pressed_up(self):
         if not self.player_moving and not self.movement_held:
@@ -298,13 +323,14 @@ class OverworldScene(engine.Scene):
                 self.player_bonking = True
                 self.player_moving = True
                 self.full_render()
-        if (self.player_moving or self.player_bonking) and self.player_direction != (0, -1):
+        if (self.player_moving
+                or self.player_bonking) and self.player_direction != (0, -1):
             self.stored_direction.put((0, -1))
         self.movement_held = True
         if not self.up_held:
             self.up_held = True
             self.held_movement_keys += 1
-    
+
     def pressed_down(self):
         if not self.player_moving and not self.movement_held:
             self.player_direction = (0, 1)
@@ -319,10 +345,10 @@ class OverworldScene(engine.Scene):
                 self.player_bonking = True
                 self.player_moving = True
                 self.full_render()
-        if (self.player_moving or self.player_bonking) and self.player_direction != (0, 1):
+        if (self.player_moving
+                or self.player_bonking) and self.player_direction != (0, 1):
             new_direction = (0, 1)
-            if self.direction_walkable(new_direction):
-                self.stored_direction.put((0, 1))
+            self.stored_direction.put((0, 1))
         self.movement_held = True
         if not self.down_held:
             self.down_held = True
@@ -381,7 +407,8 @@ class OverworldScene(engine.Scene):
             self.movement_held = False
 
     def direction_walkable(self, direction: Tuple[int, int]) -> bool:
-        destination_square = ( (self.player_x + direction[0]), (self.player_y + direction[1]) )
+        destination_square = ((self.player_x + direction[0]),
+                              (self.player_y + direction[1]))
         return self.current_map[destination_square].walkable
 
 

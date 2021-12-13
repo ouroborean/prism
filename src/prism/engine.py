@@ -20,11 +20,15 @@ import sdl2.surface
 from sdl2 import endian
 from pathlib import Path
 import prism.text_formatter
+
+
 def get_image_from_path(file_name: str) -> Image:
     with importlib.resources.path('prism.resources', file_name) as path:
         return Image.open(path)
 
+
 RESOURCES = Path(__file__).parent.parent.parent / "resources"
+
 
 def sat_subtract(subtractor: int, subtractee: int) -> int:
     subtractee -= subtractor
@@ -37,6 +41,7 @@ def get_mouse_position() -> Tuple[int, int]:
     x, y = ctypes.c_int(0), ctypes.c_int(0)
     sdl2.mouse.SDL_GetMouseState(ctypes.byref(x), ctypes.byref(y))
     return (x.value, y.value)
+
 
 class Scene:
     """Scene assets, draw regions, and associated game state."""
@@ -77,12 +82,16 @@ class Scene:
     def dispatch_key_press_event(self, event: int):
         if event in self.key_press_events:
             self.key_press_events[event]()
-    
+
     def dispatch_key_release_event(self, event: int):
         if event in self.key_release_events:
             self.key_release_events[event]()
 
-    def get_scaled_surface(self, img, width: int = 0, height: int = 0, flipped=False) -> sdl2.SDL_Surface:
+    def get_scaled_surface(self,
+                           img,
+                           width: int = 0,
+                           height: int = 0,
+                           flipped=False) -> sdl2.SDL_Surface:
         image = img
         if width != 0 or height != 0:
             image = image.resize((width, height))
@@ -100,7 +109,7 @@ class Scene:
             depth = 8
         elif mode == "RGB":
             # 3x8-bit, 24bpp
-            
+
             if endian.SDL_BYTEORDER == endian.SDL_LIL_ENDIAN:
                 rmask = 0x0000FF
                 gmask = 0x00FF00
@@ -114,7 +123,7 @@ class Scene:
         elif mode in ("RGBA", "RGBX"):
             # RGBX: 4x8-bit, no alpha
             # RGBA: 4x8-bit, alpha
-            
+
             if endian.SDL_BYTEORDER == endian.SDL_LIL_ENDIAN:
                 rmask = 0x000000FF
                 gmask = 0x0000FF00
@@ -133,41 +142,64 @@ class Scene:
             # We do not support CMYK or YCbCr for now
             raise TypeError("unsupported image format")
         pxbuf = image.tobytes()
-        imgsurface = sdl2.ext.surface.SDL_CreateRGBSurfaceFrom(pxbuf, width, height, depth, pitch, rmask, gmask, bmask, amask)
+        imgsurface = sdl2.ext.surface.SDL_CreateRGBSurfaceFrom(
+            pxbuf, width, height, depth, pitch, rmask, gmask, bmask, amask)
         imgsurface = imgsurface.contents
         imgsurface._pxbuf = pxbuf
         return imgsurface
 
-    def create_selected_version(self, surface: sdl2.SDL_Surface,
-                                filter_type: "FilterType") -> sdl2.ext.SoftwareSprite:
-        new_sprite = self.ui_factory.from_surface(sdl2.ext.BUTTON, clone_surface(surface))
+    def create_selected_version(
+            self, surface: sdl2.SDL_Surface,
+            filter_type: "FilterType") -> sdl2.ext.SoftwareSprite:
+        new_sprite = self.ui_factory.from_surface(sdl2.ext.BUTTON,
+                                                  clone_surface(surface))
 
         filter_string = filter_type.name.lower()
 
-        sdl2.surface.SDL_BlitSurface(self.get_scaled_surface(self.surfaces[filter_string]), None, new_sprite.surface,
-                                     sdl2.SDL_Rect(0, 0, 0, 0))
+        sdl2.surface.SDL_BlitSurface(
+            self.get_scaled_surface(self.surfaces[filter_string]), None,
+            new_sprite.surface, sdl2.SDL_Rect(0, 0, 0, 0))
         return new_sprite
 
-    def add_sprite_with_border(self, region: "Region", sprite: sdl2.ext.Sprite, border_sprite, x:int, y:int, depth: int=0):
+    def add_sprite_with_border(self,
+                               region: "Region",
+                               sprite: sdl2.ext.Sprite,
+                               border_sprite,
+                               x: int,
+                               y: int,
+                               depth: int = 0):
         region.add_sprite(border_sprite, x - 2, y - 2, depth=depth)
         region.add_sprite(sprite, x, y, depth)
 
-    def add_bordered_sprite(self, region: "Region", sprite: sdl2.ext.Sprite, color: sdl2.SDL_Color, x:int, y:int, depth: int=0):
+    def add_bordered_sprite(self,
+                            region: "Region",
+                            sprite: sdl2.ext.Sprite,
+                            color: sdl2.SDL_Color,
+                            x: int,
+                            y: int,
+                            depth: int = 0):
         width, height = sprite.size
-        border_sprite = self.sprite_factory.from_color(color, (width+4, height+4))
+        border_sprite = self.sprite_factory.from_color(color,
+                                                       (width + 4, height + 4))
         region.add_sprite(border_sprite, x - 2, y - 2, depth=depth)
         region.add_sprite(sprite, x, y, depth)
 
-    def update_text_display(self, font, text, text_color, display, blotter, x, y):
+    def update_text_display(self, font, text, text_color, display, blotter, x,
+                            y):
         max_width = display.size[0] - (x * 2)
         char_width = 7.3
         chars_per_line = max_width // char_width
 
         lines = textwrap.wrap(text, chars_per_line)
-        sdl2.surface.SDL_BlitSurface(self.get_scaled_surface(blotter), sdl2.SDL_Rect(0, 0, blotter.size[0], blotter.size[1]), display.surface, sdl2.SDL_Rect(0, 0, 0, 0))
+        sdl2.surface.SDL_BlitSurface(
+            self.get_scaled_surface(blotter),
+            sdl2.SDL_Rect(0, 0, blotter.size[0], blotter.size[1]),
+            display.surface, sdl2.SDL_Rect(0, 0, 0, 0))
         for row, line in enumerate(lines):
-            sdl2.surface.SDL_BlitSurface(sdl2.sdlttf.TTF_RenderText_Blended(font, str.encode(line), text_color), None, display.surface,
-                                         sdl2.SDL_Rect(x, y + (row * 15), 0, 0))
+            sdl2.surface.SDL_BlitSurface(
+                sdl2.sdlttf.TTF_RenderText_Blended(font, str.encode(line),
+                                                   text_color), None,
+                display.surface, sdl2.SDL_Rect(x, y + (row * 15), 0, 0))
 
     def create_text_display(  # pylint: disable=too-many-arguments
             self,
@@ -206,9 +238,11 @@ class Scene:
                                                 size=(width, true_height))
         # for each line in the list of lines, render that line on the sprite's surface
         for row, line in enumerate(lines):
-            text_surface = sdl2.sdlttf.TTF_RenderText_Blended(font, str.encode(line), text_color)
-            sdl2.surface.SDL_BlitSurface(text_surface, None, new_sprite.surface,
-                                         sdl2.SDL_Rect(x, y + (row * y_offset), 0, 0))
+            text_surface = sdl2.sdlttf.TTF_RenderText_Blended(
+                font, str.encode(line), text_color)
+            sdl2.surface.SDL_BlitSurface(
+                text_surface, None, new_sprite.surface,
+                sdl2.SDL_Rect(x, y + (row * y_offset), 0, 0))
             sdl2.SDL_FreeSurface(text_surface)
 
         return new_sprite
@@ -223,7 +257,11 @@ class Region:
     _regions: list["Region"]
     _sprites: list[sdl2.ext.Sprite]
 
-    def __init__(self, x: int = 0, y: int = 0, width: int = 0, height: int = 0):
+    def __init__(self,
+                 x: int = 0,
+                 y: int = 0,
+                 width: int = 0,
+                 height: int = 0):
         self.x = x
         self.y = y
         self.width = width
@@ -241,14 +279,21 @@ class Region:
         self._regions.append(subreg)
         return subreg
 
-    def add_sprite(self, sprite: sdl2.ext.Sprite, x: int, y: int, depth: int = 0):
+    def add_sprite(self,
+                   sprite: sdl2.ext.Sprite,
+                   x: int,
+                   y: int,
+                   depth: int = 0):
         sprite.x = self.x + x
         sprite.y = self.y + y
         sprite.depth = depth
         self._sprites.append(sprite)
         self._sprites.sort(key=operator.attrgetter('depth'))
 
-    def add_sprite_vertical_center(self, sprite: sdl2.ext.Sprite, x: int, depth: int = 0):
+    def add_sprite_vertical_center(self,
+                                   sprite: sdl2.ext.Sprite,
+                                   x: int,
+                                   depth: int = 0):
         sprite.x = self.x + x
         sprite.depth = depth
 
@@ -266,7 +311,7 @@ class Region:
     def clear(self):
         """Removes all sprites from this region and all sub-regions"""
         self._sprites.clear()
-        
+
         for subregion in self._regions:
             subregion.clear()
 
