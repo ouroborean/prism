@@ -5,6 +5,7 @@ import logging
 import operator
 import textwrap
 import importlib.resources
+import gc
 from typing import Iterator
 from typing import Literal
 from typing import MutableMapping
@@ -20,7 +21,10 @@ import sdl2.surface
 from sdl2 import endian
 from pathlib import Path
 import prism.text_formatter
+import typing
 
+if typing.TYPE_CHECKING:
+    from prism.scene_manager import SceneManager
 
 def get_image_from_path(file_name: str) -> Image:
     with importlib.resources.path('prism.resources', file_name) as path:
@@ -54,6 +58,7 @@ class Scene:
     font: None
     key_press_events: dict[int, Callable]
     key_release_events: dict[int, Callable]
+    scene_manager: "SceneManager"
 
     def __init__(self, sprite_type: Union[Literal[0], Literal[1]]):
         self.key_press_events = {}
@@ -314,6 +319,8 @@ class Region:
 
         for subregion in self._regions:
             subregion.clear()
+        
+        gc.collect()
 
     def from_bottom(self, y: int) -> int:
         return self.height - y

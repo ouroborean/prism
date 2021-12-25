@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Tuple
+from typing import Tuple, Callable
 import queue
 import sdl2
 import sdl2.ext
@@ -9,10 +9,14 @@ import importlib.resources
 import typing
 
 from prism import engine
-import prism.areamap
+from prism.player import Player
+from prism.areamap import get_image_from_path, map_db
+from prism.mapname import MapName
+from prism.portal import Portal
+
 if typing.TYPE_CHECKING:
     from prism.scene_manager import SceneManager
-
+    from prism.areamap import AreaMap
 
 def get_path(file_name: str) -> Path:
     with importlib.resources.path('prism.resources', file_name) as path:
@@ -20,7 +24,7 @@ def get_path(file_name: str) -> Path:
 
 
 TILE_SIZE = 40
-BASE_MOVEMENT_SPEED = 5
+BASE_MOVEMENT_SPEED = 8
 
 BLUE = sdl2.SDL_Color(0, 0, 255)
 RED = sdl2.SDL_Color(255, 0, 0)
@@ -30,7 +34,7 @@ AQUA = sdl2.SDL_Color(30, 190, 210)
 BLACK = sdl2.SDL_Color(0, 0, 0)
 WHITE = sdl2.SDL_Color(255, 255, 255)
 
-
+#region moving properties
 def moving_sideways(direction: Tuple[int, int]) -> bool:
     return direction[0] != 0
 
@@ -53,7 +57,7 @@ def moving_up(direction: Tuple[int, int]) -> bool:
 
 def moving_down(direction: Tuple[int, int]) -> bool:
     return direction[1] == 1
-
+#endregion
 
 class DirectionQueue(queue.LifoQueue):
     def __init__(self, _maxsize=0):
@@ -99,16 +103,10 @@ class DirectionQueue(queue.LifoQueue):
 
 class OverworldScene(engine.Scene):
 
-    player_sprite: sdl2.ext.SoftwareSprite
+    player: "Player"
     scene_manager: "SceneManager"
-    player_x: int
-    player_y: int
-    current_map: prism.areamap.AreaMap
-    player_direction: Tuple[int, int]
+    current_map: "AreaMap"
     stored_direction: DirectionQueue
-    player_moving: bool
-    player_bonking: bool
-    player_movement_remaining: int
     movement_released: bool
     held_movement_keys: int
     left_held: bool
@@ -116,140 +114,201 @@ class OverworldScene(engine.Scene):
     up_held: bool
     down_held: bool
     reset_direction: bool
+    event_running: bool
+    running_events: list[Callable]
 
     def __init__(self, scene_manager, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.scene_manager = scene_manager
-        self.player_sprite = self.sprite_factory.from_color(WHITE, (40, 40))
+        self.player = Player(self.sprite_factory.from_surface(self.get_scaled_surface(get_image_from_path("player.png")), free=True))
         self.background_sprite = self.sprite_factory.from_color(
             BLACK, (800, 700))
-        self.player_x = 1
-        self.player_y = 1
+        self.player.x = 1
+        self.player.y = 1
         self.movement_held = False
-        self.player_bonking = False
-        self.player_direction = (0, 0)
+        self.player.bonking = False
+        self.player.direction = (0, 0)
         self.stored_direction = DirectionQueue()
-        self.player_movement_remaining = 0
-        self.player_moving = False
-        self.current_map = prism.areamap.test_map
-        self.region.add_sprite(self.player_sprite, 240, 240)
+        self.player.movement_remaining = 0
+        self.player.moving = False
+        self.change_map(map_db[MapName.TEST])
         self.held_movement_keys = 0
         self.left_held = False
         self.right_held = False
         self.up_held = False
         self.down_held = False
         self.reset_direction = False
+        self.event_running = False
+        self.tiles = []
+        self.running_events = []
+
+    def change_map(self, new_map: "AreaMap"):
+        self.current_map = new_map    
 
     def full_render(self):
         self.region.clear()
         self.region.add_sprite(self.background_sprite, 0, 0)
         self.render_map()
+        self.render_actors()
         self.render_player()
+        self.render_foreground()
+
+
 
     def check_for_player_movement(self):
-        if self.player_moving:
+        
+        if self.player.moving:
             done = False
             continuing = False
             turning = False
             resetting = False
             for tile in self.current_map:
-                if moving_sideways(self.player_direction):
+                if moving_sideways(self.player.direction):
                     if tile.x_movement_remaining > 0:
-                        if not self.player_bonking:
+                        if not self.player.bonking:
                             tile.x_movement_remaining -= BASE_MOVEMENT_SPEED
-                    if tile.x_movement_remaining == 0 or self.player_bonking:
+                    if tile.x_movement_remaining == 0 or self.player.bonking:
+                        if tile.player_occupied and self.current_map[(self.player.x, self.player.y)] != tile:
+                            tile.player_occupied = False
                         tile.grid_x = tile.dest_x
                         if self.reset_direction:
                             self.reset_direction = False
                             resetting = True
                         if not self.direction_walkable(
-                                self.player_direction) or (
+                                self.player.direction) or (
                                     self.stored_direction.waiting()
                                     and not self.direction_walkable(
                                         self.stored_direction.peek())):
-                            self.player_bonking = True
-                        if self.movement_held and self.player_direction != (
+                            self.player.bonking = True
+                        if self.movement_held and self.player.direction != (
                                 0, 0) and (
                                     self.direction_walkable(
-                                        self.player_direction)
-                                    or self.player_bonking) and not resetting:
+                                        self.player.direction)
+                                    or self.player.bonking) and not resetting:
                             continuing = True
                             done = False
                         elif self.movement_held and self.stored_direction.waiting(
                         ) and (self.direction_walkable(
                                 self.stored_direction.peek())
-                               or self.player_bonking):
+                               or self.player.bonking):
                             turning = True
                             continuing = True
                             done = False
                         else:
                             done = True
                             continuing = False
-                            print("Done left/right")
                         tile.x_movement_remaining = 40
-                elif moving_vertically(self.player_direction):
+                if moving_vertically(self.player.direction):
                     if tile.y_movement_remaining > 0:
-                        if not self.player_bonking:
+                        if not self.player.bonking:
                             tile.y_movement_remaining -= BASE_MOVEMENT_SPEED
-                    if tile.y_movement_remaining == 0 or self.player_bonking:
+                    if tile.y_movement_remaining == 0 or self.player.bonking:
+                        if tile.player_occupied and self.current_map[(self.player.x, self.player.y)] != tile:
+                            tile.player_occupied = False
                         tile.grid_y = tile.dest_y
                         if self.reset_direction:
                             self.reset_direction = False
                             resetting = True
                         if not self.direction_walkable(
-                                self.player_direction) or (
+                                self.player.direction) or (
                                     self.stored_direction.waiting()
                                     and not self.direction_walkable(
                                         self.stored_direction.peek())):
-                            self.player_bonking = True
-                        if self.movement_held and self.player_direction != (
+                            self.player.bonking = True
+                        if self.movement_held and self.player.direction != (
                                 0, 0) and (
                                     self.direction_walkable(
-                                        self.player_direction)
-                                    or self.player_bonking) and not resetting:
+                                        self.player.direction)
+                                    or self.player.bonking) and not resetting:
                             continuing = True
                             done = False
                         elif self.movement_held and self.stored_direction.waiting(
                         ) and (self.direction_walkable(
                                 self.stored_direction.peek())
-                               or self.player_bonking):
+                               or self.player.bonking):
                             turning = True
                             continuing = True
                             done = False
                         else:
                             done = True
                             continuing = False
-                            print("Done up/down")
                         tile.y_movement_remaining = 40
-            if done:
-                self.player_moving = False
-                self.player_bonking = False
             if turning:
-                self.player_direction = self.stored_direction.get()
-            if continuing:
-                if self.direction_walkable(self.player_direction):
-                    self.player_bonking = False
-                    if moving_sideways(self.player_direction):
-                        if moving_right(self.player_direction):
+                self.player.set_direction(self.stored_direction.get())
+            if (done or continuing) and (self.player.x, self.player.y) in self.current_map.events:
+                self.player.moving = False
+                self.event_running = True
+                self.player.bonking = False
+                self.current_map.events[(self.player.x, self.player.y)](self.player, self.current_map, self)
+            elif done:
+                self.player.moving = False
+                self.player.bonking = False
+            elif continuing:
+                if self.current_map[(self.player.x, self.player.y)].ramp_direction:
+                    if self.player.direction[0] == self.current_map[(self.player.x, self.player.y)].ramp_direction[0]:
+                        self.player.set_direction(self.current_map[(self.player.x, self.player.y)].ramp_direction)
+                    elif self.player.direction[0] != 0:
+                        self.player.set_direction((self.player.direction[0], 0))
+                        
+                if self.direction_walkable(self.player.direction):
+                    self.player.bonking = False
+                    if moving_sideways(self.player.direction):
+                        if moving_right(self.player.direction):
                             for tile in self.current_map:
                                 tile.dest_x = tile.dest_x - 1
-                            self.player_x += 1
-                        elif moving_left(self.player_direction):
+                            self.player.x += 1
+                        elif moving_left(self.player.direction):
                             for tile in self.current_map:
                                 tile.dest_x = tile.dest_x + 1
-                            self.player_x -= 1
-                    elif moving_vertically(self.player_direction):
-                        if moving_up(self.player_direction):
+                            self.player.x -= 1
+                    if moving_vertically(self.player.direction):
+                        if moving_up(self.player.direction):
                             for tile in self.current_map:
                                 tile.dest_y = tile.dest_y + 1
-                            self.player_y -= 1
-                        elif moving_down(self.player_direction):
+                            self.player.y -= 1
+                        elif moving_down(self.player.direction):
                             for tile in self.current_map:
                                 tile.dest_y = tile.dest_y - 1
-                            self.player_y += 1
-            if not self.player_moving:
-                self.player_direction = (0, 0)
-            self.full_render()
+                            self.player.y += 1
+                    self.current_map[(self.player.x, self.player.y)].player_occupied = True
+            if self.player.direction == (0, 0):
+                self.player.moving = False
+
+    def check_for_actor_movement(self):
+        for actor in self.current_map.actors:
+            done = False
+            if actor.movement_script:
+                actor.movement_script(self, actor)
+            if actor.moving:
+                dest_point = (actor.position[0] + actor.direction[0], actor.position[1] + actor.direction[1])
+                dest_tile = self.current_map[dest_point]
+                if not dest_tile.player_occupied:
+                    actor.interactable = False
+                    dest_tile.occupied = True
+                    if actor.direction[0] != 0:
+                        actor.x_movement_remaining -= actor.movement_speed
+
+                        if actor.x_movement_remaining == 0 or actor.bonking:
+                            done = True
+                            actor.x_movement_remaining = 40
+                    if actor.direction[1] != 0:
+                        actor.y_movement_remaining -= actor.movement_speed
+
+                        if actor.y_movement_remaining == 0 or actor.bonking:
+                            done = True
+                            actor.y_movement_remaining = 40
+                    if done:
+                        self.current_map[actor.position].occupied = False
+                        actor.position = (actor.dest_x, actor.dest_y)
+                        self.current_map[actor.position].occupied = True
+                        self.current_map[actor.position].actor = actor
+                        actor.moving = False
+                        actor.interactable = True
+            
+
+    def event_check(self):
+        if (self.player.x, self.player.y) in self.current_map.events:
+            self.current_map.events[(self.player.x, self.player.y)](self.player, self.current_map, self)
 
     def render_map(self):
         for i in range(self.current_map.height):
@@ -257,113 +316,110 @@ class OverworldScene(engine.Scene):
                 self.region.add_sprite(
                     self.sprite_factory.from_surface(
                         self.get_scaled_surface(self.current_map[(i,
-                                                                  j)].image)),
-                    self.current_map[(i, j)].x + self.current_map.start_offset,
-                    self.current_map[(i, j)].y + self.current_map.start_offset)
+                                                                  j)].image), free=True),
+                    self.current_map[(i, j)].x + self.current_map.x_offset,
+                    self.current_map[(i, j)].y + self.current_map.y_offset)
+                if self.current_map[(i, j)].item:
+                    self.region.add_sprite(
+                    self.sprite_factory.from_surface(self.get_scaled_surface(self.current_map[(i, j)].item.image), free=True),
+                    self.current_map[(i, j)].x + self.current_map.x_offset, self.current_map[(i, j)].y + self.current_map.y_offset)
+                
+    def render_actors(self):
+        for actor in self.current_map.actors:
+            if actor.dest_x > actor.position[0]:
+                sprite_x = self.current_map[(actor.position[0], actor.position[1])].x + self.current_map.x_offset + (40 - actor.x_movement_remaining)
+            else:
+                sprite_x = self.current_map[(actor.position[0], actor.position[1])].x + self.current_map.x_offset - (40 - actor.x_movement_remaining)
+            if actor.dest_y > actor.position[1]:
+                sprite_y = self.current_map[(actor.position[0], actor.position[1])].y + self.current_map.y_offset - 5 + (40 - actor.y_movement_remaining)
+            else:
+                sprite_y = self.current_map[(actor.position[0], actor.position[1])].y + self.current_map.y_offset - 5 - (40 - actor.y_movement_remaining)
+            self.region.add_sprite(
+                    self.sprite_factory.from_surface(
+                        self.get_scaled_surface(actor.image), free=True),
+                    sprite_x,
+                    sprite_y)
 
     def render_player(self):
-        self.region.add_sprite(self.player_sprite, 240, 240)
+        self.region.add_sprite(self.player.sprite, 240, 240 - 5)
 
-    def pressed_left(self):
-        new_direction = (-1, 0)
-        if not self.player_moving and not self.movement_held:
-            self.player_direction = new_direction
-            if self.direction_walkable(self.player_direction):
+    def render_foreground(self):
+        for k, v in self.current_map.foreground_items.items():
+            self.region.add_sprite(
+                    self.sprite_factory.from_surface(
+                        self.get_scaled_surface(v), free=True),
+                    self.current_map[k].x + self.current_map.x_offset,
+                    self.current_map[k].y + self.current_map.y_offset)
+
+    def begin_movement(self, direction: Tuple[int, int]):
+        if not self.player.moving and not self.movement_held and not self.event_running:
+            if self.current_map[(self.player.x, self.player.y)].ramp_direction:
+                if self.current_map[(self.player.x, self.player.y)].ramp_direction[0] == direction[0]:
+                    direction = self.current_map[(self.player.x, self.player.y)].ramp_direction
+            self.player.set_direction(direction)
+            if self.direction_walkable(self.player.direction):
                 for tile in self.current_map:
-                    tile.dest_x = tile.grid_x + 1
-                self.player_moving = True
-                self.player_bonking = False
-                self.player_x -= 1
+                    tile.dest_x = tile.grid_x - direction[0]
+                    tile.dest_y = tile.grid_y - direction[1]
+                self.player.moving = True
+                self.player.bonking = False
+                self.player.x += direction[0]
+                self.player.y += direction[1]
+                self.current_map[(self.player.x, self.player.y)].player_occupied = True
                 self.full_render()
             else:
-                self.player_bonking = True
-                self.player_moving = True
+                self.player.bonking = True
+                self.player.moving = True
                 self.full_render()
-        if (self.player_moving
-                or self.player_bonking) and self.player_direction != (-1, 0):
-            self.stored_direction.put((-1, 0))
+        if self.player.moving or self.player.bonking:
+            self.stored_direction.put(direction)
         self.movement_held = True
+        
+
+    def pressed_left(self):
+        self.begin_movement((-1, 0))
         if not self.left_held:
             self.left_held = True
             self.held_movement_keys += 1
 
     def pressed_right(self):
-        if not self.player_moving and not self.movement_held:
-            self.player_direction = (1, 0)
-            if self.direction_walkable(self.player_direction):
-                for tile in self.current_map:
-                    tile.dest_x = tile.grid_x - 1
-                self.player_moving = True
-                self.player_bonking = False
-                self.player_x += 1
-                self.full_render()
-            else:
-                self.player_bonking = True
-                self.player_moving = True
-                self.full_render()
-        if (self.player_moving
-                or self.player_bonking) and self.player_direction != (1, 0):
-            self.stored_direction.put((1, 0))
-        self.movement_held = True
+        self.begin_movement((1, 0))
         if not self.right_held:
             self.right_held = True
             self.held_movement_keys += 1
 
     def pressed_up(self):
-        if not self.player_moving and not self.movement_held:
-            self.player_direction = (0, -1)
-            if self.direction_walkable(self.player_direction):
-                for tile in self.current_map:
-                    tile.dest_y = tile.grid_y + 1
-                self.player_moving = True
-                self.player_bonking = False
-                self.player_y -= 1
-                self.full_render()
-            else:
-                self.player_bonking = True
-                self.player_moving = True
-                self.full_render()
-        if (self.player_moving
-                or self.player_bonking) and self.player_direction != (0, -1):
-            self.stored_direction.put((0, -1))
-        self.movement_held = True
+        self.begin_movement((0, -1))
         if not self.up_held:
             self.up_held = True
             self.held_movement_keys += 1
 
     def pressed_down(self):
-        if not self.player_moving and not self.movement_held:
-            self.player_direction = (0, 1)
-            if self.direction_walkable(self.player_direction):
-                for tile in self.current_map:
-                    tile.dest_y = tile.grid_y - 1
-                self.player_moving = True
-                self.player_bonking = False
-                self.player_y += 1
-                self.full_render()
-            else:
-                self.player_bonking = True
-                self.player_moving = True
-                self.full_render()
-        if (self.player_moving
-                or self.player_bonking) and self.player_direction != (0, 1):
-            new_direction = (0, 1)
-            self.stored_direction.put((0, 1))
-        self.movement_held = True
+        self.begin_movement((0, 1))
         if not self.down_held:
             self.down_held = True
             self.held_movement_keys += 1
+
+    def pressed_interact(self):
+        target_square = ((self.player.x + self.player.direction[0]),
+                              (self.player.y + self.player.direction[1]))
+        if self.current_map[target_square].has_item:
+            self.current_map[target_square].item.pickup_script(self, self.current_map[target_square].item)
+            self.current_map[target_square].item = None
+            self.full_render()
+        elif self.current_map[target_square].occupied and self.current_map[target_square].actor.interactable:
+            self.current_map[target_square].actor.dialogue_script(self)
 
     def released_down(self):
         self.down_held = False
         self.held_movement_keys -= 1
         if (0, 1) in self.stored_direction:
             self.stored_direction.remove((0, 1))
-        if self.player_direction == (0, 1):
-            if self.player_moving or self.player_bonking:
+        if self.player.direction[1] == 1:
+            if self.player.moving or self.player.bonking:
                 self.reset_direction = True
             else:
-                self.player_direction = (0, 0)
+                self.player.set_direction((self.player.direction[0], 0))
         if self.held_movement_keys == 0:
             self.movement_held = False
 
@@ -372,11 +428,11 @@ class OverworldScene(engine.Scene):
         self.held_movement_keys -= 1
         if (0, -1) in self.stored_direction:
             self.stored_direction.remove((0, -1))
-        if self.player_direction == (0, -1):
-            if self.player_moving or self.player_bonking:
+        if self.player.direction[1] == -1:
+            if self.player.moving or self.player.bonking:
                 self.reset_direction = True
             else:
-                self.player_direction = (0, 0)
+                self.player.set_direction((self.player.direction[0], 0))
         if self.held_movement_keys == 0:
             self.movement_held = False
 
@@ -385,11 +441,11 @@ class OverworldScene(engine.Scene):
         self.held_movement_keys -= 1
         if (-1, 0) in self.stored_direction:
             self.stored_direction.remove((-1, 0))
-        if self.player_direction == (-1, 0):
-            if self.player_moving or self.player_bonking:
+        if self.player.direction[0] == -1:
+            if self.player.moving or self.player.bonking:
                 self.reset_direction = True
             else:
-                self.player_direction = (0, 0)
+                self.player.set_direction((0, self.player.direction[1]))
         if self.held_movement_keys == 0:
             self.movement_held = False
 
@@ -398,19 +454,22 @@ class OverworldScene(engine.Scene):
         self.held_movement_keys -= 1
         if (1, 0) in self.stored_direction:
             self.stored_direction.remove((1, 0))
-        if self.player_direction == (1, 0):
-            if self.player_moving or self.player_bonking:
+        if self.player.direction[0] == 1:
+            if self.player.moving or self.player.bonking:
                 self.reset_direction = True
             else:
-                self.player_direction = (0, 0)
+                self.player.set_direction((0, self.player.direction[1]))
         if self.held_movement_keys == 0:
             self.movement_held = False
 
     def direction_walkable(self, direction: Tuple[int, int]) -> bool:
-        destination_square = ((self.player_x + direction[0]),
-                              (self.player_y + direction[1]))
-        return self.current_map[destination_square].walkable
+        destination_square = ((self.player.x + direction[0]),
+                              (self.player.y + direction[1]))
+        return self.current_map[destination_square].walkable and not self.current_map[destination_square].has_item and not self.current_map[destination_square].occupied
 
+    def pressed_inventory(self):
+        for item in self.player.bag:
+            print(item.name)
 
 def make_overworld_scene(scene_manager) -> OverworldScene:
     scene = OverworldScene(scene_manager, sdl2.ext.SOFTWARE)
@@ -418,6 +477,8 @@ def make_overworld_scene(scene_manager) -> OverworldScene:
     scene.key_press_events[sdl2.SDLK_RIGHT] = scene.pressed_right
     scene.key_press_events[sdl2.SDLK_UP] = scene.pressed_up
     scene.key_press_events[sdl2.SDLK_DOWN] = scene.pressed_down
+    scene.key_press_events[sdl2.SDLK_e] = scene.pressed_interact
+    scene.key_press_events[sdl2.SDLK_q] = scene.pressed_inventory
     scene.key_release_events[sdl2.SDLK_LEFT] = scene.released_left
     scene.key_release_events[sdl2.SDLK_RIGHT] = scene.released_right
     scene.key_release_events[sdl2.SDLK_UP] = scene.released_up

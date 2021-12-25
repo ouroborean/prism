@@ -4,9 +4,10 @@ from PIL import ImageFont
 
 
 with importlib.resources.path('prism.resources', "Basic-Regular.ttf") as path:
-    FONT = ImageFont.truetype(str(path), size = 16)
+    FONT = ImageFont.truetype(str(path), size = 30)
 
-
+def get_word_size(word: str):
+    return FONT.getsize(word)
 
 @dataclass
 class WordData:
@@ -18,9 +19,8 @@ def get_lines(input: str, max_width: int) -> list[str]:
 
     words = input.split()
     word_data = []
-    length = -4
+    length = 0
     for word in words:
-        length += 4
         width, _ = FONT.getsize(word)
         length += width
         word_data.append(WordData(length, word))

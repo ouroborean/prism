@@ -1,4 +1,3 @@
-from asyncio.exceptions import CancelledError
 import logging
 import asyncio
 import contextvars
@@ -6,9 +5,8 @@ import time
 import sdl2
 import sdl2.ext
 import sdl2.sdlttf
-import typing
 from prism.scene_manager import SceneManager
-from prism import overworld_scene
+from prism import dialogue_scene, overworld_scene
 
 
 def main():
@@ -33,8 +31,9 @@ def main():
     #TODO Initialize scenes
     scene_manager.overworld = overworld_scene.make_overworld_scene(
         scene_manager)
+    scene_manager.dialogue = dialogue_scene.make_dialogue_scene(scene_manager)
 
-    scene_manager.set_scene_to_current(scene_manager.overworld)
+    scene_manager.set_scene_to_active(scene_manager.overworld)
     scene_manager.spriterenderer.render(
         scene_manager.current_scene.renderables())
 
@@ -64,9 +63,13 @@ async def game_loop(scene_manager: SceneManager,
                         event.key.keysym.sym)
         if scene_manager.current_scene == scene_manager.overworld:
             scene_manager.current_scene.check_for_player_movement()
-
+            scene_manager.current_scene.check_for_actor_movement()
+            scene_manager.current_scene.full_render()
+        if scene_manager.current_scene == scene_manager.dialogue:
+            if scene_manager.current_scene.printing_dialogue and scene_manager.frame_count % scene_manager.current_scene.dialogue_speed == 0 and scene_manager.current_scene.not_waiting():
+                scene_manager.current_scene.full_render()
         scene_manager.spriterenderer.render(
-            scene_manager.current_scene.renderables())
+            scene_manager.renderables())
         window.refresh()
         done = time.monotonic()
         elapsed_time = start - done
