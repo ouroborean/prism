@@ -15,7 +15,9 @@ if typing.TYPE_CHECKING:
     from prism.engine import Scene
     from prism.overworld_scene import OverworldScene
     from prism.dialogue_scene import DialogueScene
-
+    from prism.menu_scene import MenuScene
+    from prism.battle_scene import BattleScene
+    from prism.player import Player
 
 class SceneManager:
     """Manager for all game scenes"""
@@ -29,6 +31,9 @@ class SceneManager:
     active_scenes: list["Scene"]
     dialogue: "DialogueScene"
     overworld: "OverworldScene"
+    menu: "MenuScene"
+    battle: "BattleScene"
+    stored_prompt: str
 
     @property
     def current_scene(self):
@@ -43,6 +48,7 @@ class SceneManager:
         self.surfaces = {}
         self.sounds = {}
         self.active_scenes = []
+        self.stored_prompt = ""
         if window:
             self.window = window
             self.factory = sdl2.ext.SpriteFactory(sdl2.ext.SOFTWARE,
@@ -76,6 +82,12 @@ class SceneManager:
             self.dialogue.create_dialogue_with_prompt(message, prompts)
         else:
             self.dialogue.create_dialogue(message)
+
+    def pull_up_menu(self, player: "Player"):
+        print("Current scene set to menu")
+        self.set_scene_to_active(self.menu)
+        self.menu.set_player(player)
+        self.current_scene.full_render()
 
     def set_scene_to_active(self, scene):
         self.active_scenes.append(scene)

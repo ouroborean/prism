@@ -115,6 +115,7 @@ class OverworldScene(engine.Scene):
     down_held: bool
     reset_direction: bool
     event_running: bool
+    menu_opening: bool
     running_events: list[Callable]
 
     def __init__(self, scene_manager, *args, **kwargs):
@@ -125,6 +126,7 @@ class OverworldScene(engine.Scene):
             BLACK, (800, 700))
         self.player.x = 1
         self.player.y = 1
+        self.menu_opening = False
         self.movement_held = False
         self.player.bonking = False
         self.player.direction = (0, 0)
@@ -157,7 +159,7 @@ class OverworldScene(engine.Scene):
 
     def check_for_player_movement(self):
         
-        if self.player.moving:
+        if self.player.moving and not self.event_running:
             done = False
             continuing = False
             turning = False
@@ -244,6 +246,7 @@ class OverworldScene(engine.Scene):
                 self.player.moving = False
                 self.player.bonking = False
             elif continuing:
+                
                 if self.current_map[(self.player.x, self.player.y)].ramp_direction:
                     if self.player.direction[0] == self.current_map[(self.player.x, self.player.y)].ramp_direction[0]:
                         self.player.set_direction(self.current_map[(self.player.x, self.player.y)].ramp_direction)
@@ -413,6 +416,8 @@ class OverworldScene(engine.Scene):
     def released_down(self):
         self.down_held = False
         self.held_movement_keys -= 1
+        if self.held_movement_keys < 0:
+            self.held_movement_keys = 0
         if (0, 1) in self.stored_direction:
             self.stored_direction.remove((0, 1))
         if self.player.direction[1] == 1:
@@ -426,6 +431,8 @@ class OverworldScene(engine.Scene):
     def released_up(self):
         self.up_held = False
         self.held_movement_keys -= 1
+        if self.held_movement_keys < 0:
+            self.held_movement_keys = 0
         if (0, -1) in self.stored_direction:
             self.stored_direction.remove((0, -1))
         if self.player.direction[1] == -1:
@@ -439,6 +446,8 @@ class OverworldScene(engine.Scene):
     def released_left(self):
         self.left_held = False
         self.held_movement_keys -= 1
+        if self.held_movement_keys < 0:
+            self.held_movement_keys = 0
         if (-1, 0) in self.stored_direction:
             self.stored_direction.remove((-1, 0))
         if self.player.direction[0] == -1:
@@ -452,6 +461,8 @@ class OverworldScene(engine.Scene):
     def released_right(self):
         self.right_held = False
         self.held_movement_keys -= 1
+        if self.held_movement_keys < 0:
+            self.held_movement_keys = 0
         if (1, 0) in self.stored_direction:
             self.stored_direction.remove((1, 0))
         if self.player.direction[0] == 1:
@@ -470,6 +481,20 @@ class OverworldScene(engine.Scene):
     def pressed_inventory(self):
         for item in self.player.bag:
             print(item.name)
+        
+    def reset_keys_held(self):
+        self.left_held = False
+        self.right_held = False
+        self.up_held = False
+        self.down_held = False
+        self.held_movement_keys = 0
+        self.movement_held = False
+
+    def pressed_menu(self):
+        if not self.player.moving:    
+            self.reset_keys_held()
+            self.scene_manager.pull_up_menu(self.player)
+        
 
 def make_overworld_scene(scene_manager) -> OverworldScene:
     scene = OverworldScene(scene_manager, sdl2.ext.SOFTWARE)
@@ -483,5 +508,6 @@ def make_overworld_scene(scene_manager) -> OverworldScene:
     scene.key_release_events[sdl2.SDLK_RIGHT] = scene.released_right
     scene.key_release_events[sdl2.SDLK_UP] = scene.released_up
     scene.key_release_events[sdl2.SDLK_DOWN] = scene.released_down
+    scene.key_press_events[sdl2.SDLK_ESCAPE] = scene.pressed_menu
     scene.full_render()
     return scene

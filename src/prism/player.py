@@ -1,10 +1,17 @@
+from PIL.Image import init
 import sdl2
 import sdl2.ext
 from typing import Tuple
 import typing
+from prism.poke_db import initialize_pokemon
+from prism.abi_db import initialize_abilities
 
 if typing.TYPE_CHECKING:
     from prism.areamap import Item
+    from prism.pokemon import Pokemon
+
+poke_db = initialize_pokemon()
+abi_db = initialize_abilities()
 
 class Player:
     sprite: sdl2.ext.SoftwareSprite
@@ -15,6 +22,8 @@ class Player:
     movement_remaining: int
     direction: Tuple[int, int]
     bag: list["Item"]
+    team: list["Pokemon"]
+
     def __init__(self, sprite):
         self.movement_remaining = 0
         self.x=1
@@ -24,6 +33,11 @@ class Player:
         self.direction = (0,0)
         self.sprite = sprite
         self.bag = []
+        mudkip = poke_db["mudkip"]
+        mudkip.set_level(5)
+        mudkip.set_passive(mudkip.passive_pool[0])
+        mudkip.learn_ability(abi_db["water_gun"])
+        self.team = [mudkip, ]
 
     def pick_up_item(self, item: "Item"):
         self.bag.append(item)

@@ -1,13 +1,19 @@
 from dataclasses import dataclass
 import importlib.resources
 from PIL import ImageFont
-
+import os
 
 with importlib.resources.path('prism.resources', "Basic-Regular.ttf") as path:
-    FONT = ImageFont.truetype(str(path), size = 30)
+    FONT = ImageFont.truetype(os.fspath(path), size = 30)
+
+with importlib.resources.path('prism.resources', "Basic-Regular.ttf") as path:
+    MENU_FONT = ImageFont.truetype(os.fspath(path), size = 40)
 
 def get_word_size(word: str):
-    return FONT.getsize(word)
+    return FONT.getsize(word)[0]
+
+def get_menu_word_size(word: str):
+    return MENU_FONT.getsize(word)[0]
 
 @dataclass
 class WordData:

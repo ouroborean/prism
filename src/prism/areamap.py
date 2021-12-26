@@ -31,6 +31,7 @@ def default_pickup(scene: "OverworldScene", item: "Item"):
 def test_event_pickup(scene: "OverworldScene", item: "Item"):
     scene.event_running = True
     actor = item.actors[0]
+    scene.player.pick_up_item(item)
     if not actor.movement_script:
         def test_event_movement(scene: "OverworldScene", actor: Actor):
             if actor.movement_phase == 1:
@@ -38,13 +39,26 @@ def test_event_pickup(scene: "OverworldScene", item: "Item"):
             if actor.movement_phase == 2:
                 move_actor(actor, (0, -1), (11, 2), 3)
             if actor.movement_phase == 3:
-                scene.scene_manager.start_dialogue("Great job picking up that item, you shiiiiiit!")
+                scene.scene_manager.start_dialogue("Great job picking up that item, you shiiiiiit!", prompts=["Thanks", "Go Away", "Wicked Sick!"])
+                
                 actor.movement_phase = 4
+
             if actor.movement_phase == 4:
-                move_actor(actor, (0, 1), (11, 4), 5)
+                if scene.scene_manager.current_scene != scene.scene_manager.dialogue:
+                    response = scene.scene_manager.stored_prompt
+                    print(response)
+                    if response == "Go Away":
+                        scene.scene_manager.start_dialogue("No, you go away!")
+                    elif response == "Thanks":
+                        scene.scene_manager.start_dialogue("Don't make this weird.")
+                    elif response == "Wicked Sick!":
+                        scene.scene_manager.start_dialogue("God, I hate that game.")
+                    actor.movement_phase = 5
             if actor.movement_phase == 5:
-                move_actor(actor, (-1, 0), (8, 4), 6)
+                move_actor(actor, (0, 1), (11, 4), 6)
             if actor.movement_phase == 6:
+                move_actor(actor, (-1, 0), (8, 4), 7)
+            if actor.movement_phase == 7:
                 scene.event_running = False
                 
         actor.movement_script = test_event_movement

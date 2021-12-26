@@ -5,8 +5,9 @@ import time
 import sdl2
 import sdl2.ext
 import sdl2.sdlttf
+from prism.menu_scene import MenuScene
 from prism.scene_manager import SceneManager
-from prism import dialogue_scene, overworld_scene
+from prism import dialogue_scene, overworld_scene, menu_scene, battle_scene
 
 
 def main():
@@ -32,8 +33,10 @@ def main():
     scene_manager.overworld = overworld_scene.make_overworld_scene(
         scene_manager)
     scene_manager.dialogue = dialogue_scene.make_dialogue_scene(scene_manager)
-
-    scene_manager.set_scene_to_active(scene_manager.overworld)
+    scene_manager.menu = menu_scene.make_menu_scene(scene_manager)
+    scene_manager.battle = battle_scene.make_battle_scene(scene_manager)
+    
+    scene_manager.set_scene_to_active(scene_manager.battle)
     scene_manager.spriterenderer.render(
         scene_manager.current_scene.renderables())
 
@@ -61,13 +64,13 @@ async def game_loop(scene_manager: SceneManager,
                 if event.type == sdl2.SDL_KEYUP:
                     scene_manager.dispatch_key_release_event(
                         event.key.keysym.sym)
-        if scene_manager.current_scene == scene_manager.overworld:
+        if scene_manager.current_scene == scene_manager.dialogue:
+            if scene_manager.current_scene.printing_dialogue and scene_manager.frame_count % scene_manager.current_scene.dialogue_speed == 0 and scene_manager.current_scene.not_waiting():
+                scene_manager.current_scene.full_render()                        
+        elif scene_manager.current_scene == scene_manager.overworld:
             scene_manager.current_scene.check_for_player_movement()
             scene_manager.current_scene.check_for_actor_movement()
             scene_manager.current_scene.full_render()
-        if scene_manager.current_scene == scene_manager.dialogue:
-            if scene_manager.current_scene.printing_dialogue and scene_manager.frame_count % scene_manager.current_scene.dialogue_speed == 0 and scene_manager.current_scene.not_waiting():
-                scene_manager.current_scene.full_render()
         scene_manager.spriterenderer.render(
             scene_manager.renderables())
         window.refresh()
