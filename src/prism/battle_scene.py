@@ -13,14 +13,13 @@ from prism.poke_db import initialize_pokemon
 from prism.abi_db import initialize_abilities
 from prism.stat import Stat
 from prism.status import BattleEffect
-from prism.pokemon import pokespawn
+from prism.pokemon import pokespawn, Pokemon
 import enum
 
 if typing.TYPE_CHECKING:
     from prism.scene_manager import SceneManager
     from prism.player import Player
     from prism.trainer import Trainer
-    from prism.pokemon import Pokemon
 
 def get_image_from_path(file_name: str) -> Image:
     with importlib.resources.path('prism.resources', file_name) as path:
@@ -42,18 +41,18 @@ class BattleSlot:
     active_pokemon: "Pokemon"
     effects: list[BattleEffect]
     battle: "Battle"
-    team: list[Pokemon]
+    team: list["Pokemon"]
 
     def __init__(self):
         self.effects = []
 
-    def assign_initial_pokemon(self, pokemon: Pokemon):
+    def assign_initial_pokemon(self, pokemon: "Pokemon"):
         self.active_pokemon = pokemon
         pokemon.set_battleslot(self)
         self.team.remove(pokemon)
         self.team.append(pokemon)
 
-    def assign_team(self, team: list[Pokemon]):
+    def assign_team(self, team: list["Pokemon"]):
         self.team = team
 
     def add_effect(self, effect: BattleEffect):
@@ -71,7 +70,7 @@ class BattleSlot:
 
 class Battle:
     battle_slots: Tuple[BattleSlot]
-    teams: Tuple[list[Pokemon]]
+    teams: Tuple[list["Pokemon"]]
     effects: list[BattleEffect]
 
     def __init__(self):
@@ -82,7 +81,7 @@ class Battle:
             battle_slot.battle = self
         self.battle_slots = slots
     
-    def assign_teams(self, teams: Tuple[list[Pokemon]]):
+    def assign_teams(self, teams: Tuple[list["Pokemon"]]):
         self.teams = teams
         for team in teams:
             for pokemon in team:
@@ -285,6 +284,7 @@ class BattleScene(engine.Scene):
         outer_box = self.sprite_factory.from_color(AQUA, self.battle_info_region.size())
         inner_box = self.sprite_factory.from_color(WHITE, (outer_box.size[0] - 18, outer_box.size[1] - 18))
         abilities_to_render = []
+        info_to_render = ()
         if self.selecting_action:
             if self.waiting_for_input:
                 lines = ["What will", f"{self.player_pokemon.name} do?"]
@@ -307,6 +307,15 @@ class BattleScene(engine.Scene):
                 if i != self.selected_ability:
                     null_filter = self.get_scaled_surface(get_image_from_path("null_filter.png"))
                     sdl2.surface.SDL_BlitSurface(null_filter, None, ability_button.surface, sdl2.SDL_Rect(0, 0, 0, 0))
+                else:
+                    ability_type_sprite = self.sprite_factory.from_surface(self.get_scaled_surface(ability.ability_type_sprite))
+                    ability_class_sprite = self.sprite_factory.from_surface(self.get_scaled_surface(ability.ability_class_sprite))
+                    pp_text = sdl2.sdlttf.TTF_RenderText_Blended(self.ability_font, str.encode(f"{self.player_pokemon.current_pp[i]}/{ability.max_pp}"), BLACK)
+                    pp_width = text_formatter.get_ability_word_size(f"{self.player_pokemon.current_pp[i]}/{ability.max_pp}")
+                    sdl2.surface.SDL_BlitSurface(pp_text, None, inner_box.surface, sdl2.SDL_Rect(678 + ((100 - pp_width) // 2), 112, 0, 0))
+                    sdl2.SDL_FreeSurface(pp_text)
+                    info_to_render = (ability_type_sprite, ability_class_sprite)
+
                 sdl2.SDL_FreeSurface(ability_text)
                 abilities_to_render.append(ability_button)
 
@@ -317,6 +326,9 @@ class BattleScene(engine.Scene):
         if abilities_to_render:
             for i, ability in enumerate(abilities_to_render):
                 self.battle_info_region.add_sprite(ability, 14 + ((i % 2) * 336), 12 + ((i // 2) * 90))
+            
+            self.battle_info_region.add_sprite(info_to_render[0], 688, 15)
+            self.battle_info_region.add_sprite(info_to_render[1], 688, 54)
 
     def render_battle_options_region(self):
         self.battle_options_region.clear()

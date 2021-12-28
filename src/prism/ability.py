@@ -43,6 +43,8 @@ class Ability:
     priority: int
     accuracy: int
     ability_plate: Image.Image
+    ability_type_sprite: Image.Image
+    ability_class_sprite: Image.Image
 
     def __init__(self, name: str, ptype: ptypes.PokemonType, accuracy: Optional[int], max_pp: int, priority: int,
                  target: TargetingType, atype: Tuple[AbilityType],
@@ -50,7 +52,12 @@ class Ability:
         self.name = name
         self.accuracy = accuracy
         self.ptype = ptype
+
+        self.ability_type_sprite = get_image_from_path(ptype.name.lower() + ".png")
+
         self.atype = {}
+
+
         self.target = target
         self.max_pp = max_pp
         self.current_pp = max_pp
@@ -61,6 +68,15 @@ class Ability:
         for i, abi_type in enumerate(atype):
             self.atype[abi_type] = []
             self.atype[abi_type].append(effects[i])
+
+        if AbilityType.DAMAGE in self.atype:
+            if self.atype[AbilityType.DAMAGE][0][1] == Stat.ATK:
+                self.ability_class_sprite = get_image_from_path("physical.png")
+            elif self.atype[AbilityType.DAMAGE][0][1] == Stat.SPATK:
+                self.ability_class_sprite = get_image_from_path("special.png")
+        else:
+            self.ability_class_sprite = get_image_from_path("status.png")
+
         self.tags = []
         self.tags.extend(args)
     
