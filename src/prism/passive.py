@@ -11,4 +11,7 @@ class Passive(enum.IntEnum):
     TORRENT = 6
     DAMP = 7
     LEVITATE = 8
+    INTIMIDATE = 9
+    STEADFAST = 10
+    TECHNICIAN = 11
 

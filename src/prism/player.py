@@ -33,11 +33,6 @@ class Player:
         self.direction = (0,0)
         self.sprite = sprite
         self.bag = []
-        mudkip = poke_db["mudkip"]
-        mudkip.set_level(5)
-        mudkip.set_passive(mudkip.passive_pool[0])
-        mudkip.learn_ability(abi_db["water_gun"])
-        self.team = [mudkip, ]
 
     def pick_up_item(self, item: "Item"):
         self.bag.append(item)

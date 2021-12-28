@@ -1,9 +1,13 @@
 import enum
 from typing import Tuple, Dict, Optional
-
+from PIL import Image
 from .stat import Stat
 from . import ptypes
+import importlib.resources
 
+def get_image_from_path(file_name: str) -> Image:
+    with importlib.resources.path('prism.resources', file_name) as path:
+        return Image.open(path)
 
 @enum.unique
 class AbilityType(enum.IntEnum):
@@ -38,6 +42,7 @@ class Ability:
     tags: list[str]
     priority: int
     accuracy: int
+    ability_plate: Image.Image
 
     def __init__(self, name: str, ptype: ptypes.PokemonType, accuracy: Optional[int], max_pp: int, priority: int,
                  target: TargetingType, atype: Tuple[AbilityType],
@@ -50,6 +55,9 @@ class Ability:
         self.max_pp = max_pp
         self.current_pp = max_pp
         self.priority = priority
+
+        self.ability_plate = get_image_from_path(ptype.name.lower() + "_button.png")
+
         for i, abi_type in enumerate(atype):
             self.atype[abi_type] = []
             self.atype[abi_type].append(effects[i])

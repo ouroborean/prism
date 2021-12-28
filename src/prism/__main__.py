@@ -76,6 +76,7 @@ async def game_loop(scene_manager: SceneManager,
         window.refresh()
         done = time.monotonic()
         elapsed_time = start - done
+        
         scene_manager.frame_count += 1
         if scene_manager.frame_count > 60:
             scene_manager.frame_count = 0

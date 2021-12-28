@@ -75,7 +75,7 @@ class DialogueScene(engine.Scene):
     def create_dialogue(self, message: str):
         self.message = message
         self.printing_dialogue = True
-        self.lines_to_print = get_lines(message, 580)
+        self.lines_to_print = get_lines(message, 580, FONTSIZE)
 
 
     def create_dialogue_with_prompt(self, message: str, prompts: list[str]):
@@ -83,7 +83,7 @@ class DialogueScene(engine.Scene):
         self.message = message
         self.prompts = prompts
         self.printing_dialogue = True
-        self.lines_to_print = get_lines(message, 580)
+        self.lines_to_print = get_lines(message, 580, FONTSIZE)
 
     def render_prompt(self):
         widest_prompt = 0
@@ -133,7 +133,7 @@ class DialogueScene(engine.Scene):
                         self.characters_printed = 0
                     elif self.lines_printed == 3:
                         next_lines = [line[self.characters_printed:], *[line for line in self.lines_to_print[3:]]]
-                        self.next_lines = get_lines("".join(next_lines), 580)
+                        self.next_lines = get_lines("".join(next_lines), 580, FONTSIZE)
                         self.confirm_to_continue = True
                     self.characters_printed = 0
 

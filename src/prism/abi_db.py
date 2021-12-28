@@ -1,11 +1,10 @@
 from typing import Dict
 
-from prism.pokemon import Pokemon
 
-from .ability import Ability, AbilityType, TargetingType
-from .stat import Stat
-from .ptypes import PokemonType
-from .status import StatusEffect, BattleEffect, BattleEffectType
+from prism.ability import Ability, AbilityType, TargetingType
+from prism.stat import Stat
+from prism.ptypes import PokemonType
+from prism.status import StatusEffect, BattleEffect, BattleEffectType
 
 
 

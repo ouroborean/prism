@@ -9,23 +9,36 @@ with importlib.resources.path('prism.resources', "Basic-Regular.ttf") as path:
 with importlib.resources.path('prism.resources', "Basic-Regular.ttf") as path:
     MENU_FONT = ImageFont.truetype(os.fspath(path), size = 40)
 
+with importlib.resources.path('prism.resources', "Basic-Regular.ttf") as path:
+    BATTLE_MENU_FONT = ImageFont.truetype(os.fspath(path), size = 48)
+
+with importlib.resources.path('prism.resources', "Basic-Regular.ttf") as path:
+    ABILITY_FONT = ImageFont.truetype(os.fspath(path), size = 32)
+
 def get_word_size(word: str):
     return FONT.getsize(word)[0]
 
 def get_menu_word_size(word: str):
     return MENU_FONT.getsize(word)[0]
 
+def get_battle_menu_word_size(word: str):
+    return BATTLE_MENU_FONT.getsize(word)[0]
+
+def get_ability_word_size(word: str):
+    return ABILITY_FONT.getsize(word)[0]
+
 @dataclass
 class WordData:
     length: int
     word: str
 
-def get_lines(input: str, max_width: int) -> list[str]:
-    
+def get_lines(input: str, max_width: int, fontsize: int) -> list[str]:
 
     words = input.split()
     word_data = []
     length = 0
+    with importlib.resources.path('prism.resources', "Basic-Regular.ttf") as path:
+            FONT = ImageFont.truetype(os.fspath(path), size = fontsize)
     for word in words:
         width, _ = FONT.getsize(word)
         length += width

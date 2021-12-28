@@ -3,12 +3,16 @@ from typing import Tuple, Optional
 import typing
 import random
 from PIL import Image
-from prism.status import StatusEffect, status_applied, status_desc, is_greater_status
+from prism.abi_db import initialize_abilities
+from prism.status import StatusEffect, status_applied, is_greater_status
 from prism.stat import Stat
 from prism import ptypes
 from prism.ability import Ability, AbilityType, TargetingType
 from prism.passive import Passive
 import importlib.resources
+from prism.poke_db import initialize_pokemon
+
+
 
 if typing.TYPE_CHECKING:
     from prism.battle import BattleSlot
@@ -27,7 +31,20 @@ def get_stat_mod(stages: int) -> float:
     
     return over/under
 
+db = initialize_pokemon()
+adb = initialize_abilities()
+
+def pokespawn(database_name: str, level: int, moveset: list[str] = [], wild: bool = False) -> "Pokemon":
+    pokemon = Pokemon(*db[database_name])
+    pokemon.set_level(level)
+    if moveset:
+        for move in moveset:
+            pokemon.learn_ability(adb[move])
+
+    return pokemon
+
 natures = {
+    "Serious": (None),
     "Lonely": (Stat.ATK, Stat.DEF),
     "Brave": (Stat.ATK, Stat.SPD),
     "Adamant": (Stat.ATK, Stat.SPATK),
@@ -56,6 +73,7 @@ class Pokemon:
     
     name: str
     database_name: str
+    is_egg: bool
     abilities: list[Ability]
     status_effects: dict[StatusEffect, int]
     current_hp: int
@@ -69,11 +87,13 @@ class Pokemon:
     level: int
     front_image: Image.Image
     back_image: Image.Image
+    current_pp: list[int]
 
-    def __init__(self, name: str, types: Tuple[ptypes.PokemonType], atk: int, defense: int, spatk: int, spdef: int, spd: int, hp: int, passive_pool: Tuple[Passive]):
+    def __init__(self, name: str, types: Tuple[ptypes.PokemonType], atk: int, defense: int, spatk: int, spdef: int, spd: int, hp: int, passive_pool: Tuple[Passive], egg: bool = False):
         self.decision = 0
         self.name = name
         self.database_name = self.get_database_name(name)
+        self.is_egg = egg
         try:
             self.front_image = get_image_from_path(self.database_name + "_front.png")
         except:
@@ -92,7 +112,7 @@ class Pokemon:
         self.team = []
         self.status_effects = {}
         self.passive_pool = passive_pool
-        self.move_pool = []
+        self.current_pp = []
         self.fainted = False
         self.base_stats = {
             Stat.ATK: atk,
@@ -164,6 +184,7 @@ class Pokemon:
         self.team = team
 
     def learn_ability(self, ability: Ability):
+        self.current_pp.append(ability.max_pp)
         self.abilities.append(ability)
 
     def set_passive(self, passive: Passive):
@@ -195,7 +216,7 @@ class Pokemon:
     def get_stat(self, stat: Stat) -> int:
         if stat == Stat.HP:
             mod_stat = (.01 * (2 * self.base_stats[stat] + self.iv[stat] + (self.ev[stat] * .25)) * self.level)
-            mod_stat += 10
+            mod_stat += 10 + self.level
         else:
             mod_stat = (.01 * (2 * self.base_stats[stat] + self.iv[stat] + (self.ev[stat] * .25)) * self.level)
             mod_stat += 5
