@@ -88,12 +88,27 @@ class Pokemon:
     front_image: Image.Image
     back_image: Image.Image
     current_pp: list[int]
+    sleep_duration: int
+    action_failed: bool
+    failed_confusion: bool
+    failed_attract: bool
+    failed_sleep: bool
+    failed_frozen: bool
+    failed_paralyze: bool
 
     def __init__(self, name: str, types: Tuple[ptypes.PokemonType], atk: int, defense: int, spatk: int, spdef: int, spd: int, hp: int, passive_pool: Tuple[Passive], egg: bool = False):
-        self.decision = 0
+        self.decision = 10
         self.name = name
         self.database_name = self.get_database_name(name)
         self.is_egg = egg
+        self.sleep_duration = 0
+        self.action_failed = False
+        self.failed_attract = False
+        self.failed_confusion = False
+        self.failed_frozen = False
+        self.failed_paralyze = False
+        self.failed_sleep = False
+        self.passive = Passive.INTIMIDATE
         try:
             self.front_image = get_image_from_path(self.database_name + "_front.png")
         except:
@@ -156,7 +171,7 @@ class Pokemon:
         return name.lower()
 
     def using_ability(self) -> bool:
-        if self.decision >= len(self.abilities):
+        if self.decision >= len(self.abilities) and self.decision != 10:
             return False
         return True
 
@@ -333,30 +348,70 @@ class Pokemon:
                     print(f"{target.name}'s {boost.name} has been raised by {boost_mag}!")
                 target.receive_boost(boost, boost_mag)
 
-    def check_for_status_failure(self) -> bool:
+    def pre_check_for_status_failure(self, scene) -> bool:
         for status in self.status_effects:
             if status == StatusEffect.PARALYZE:
                 roll = random.randint(1,100)
                 if roll <= 25:
-                    print(f"{self.name} is paralyzed! It can't move!")
+                    self.failed_paralyze = True
+                    scene.pre_message_queue.append(f"{self.name} is paralyzed! It can't move!")
                     return True
             if status == StatusEffect.CONFUSE:
                 roll = random.randint(1, 100)
                 print(f"{self.name} is confused!")
                 if roll <= 33:
-                    print(f"{self.name} hurt itself in its confusion!")
+                    self.failed_confusion = True
+                    scene.pre_message_queue.append(f"{self.name} hurt itself in its confusion!")
                     self.confusion_self_damage()
                     return True
             if status == StatusEffect.FREEZE:
-                print(f"{self.name} is frozen solid!")
-                return True
+                if roll <= 20:
+                    self.failed_frozen = True
+                    scene.pre_message_queue.append(f"{self.name} is frozen solid!")
+                    return True
             if status == StatusEffect.ATTRACT:
-                print(f"{self.name} is in love!")
+                scene.pre_message_queue.append(f"{self.name} is in love!")
                 roll = random.randint(1, 100)
                 if roll <= 50:
-                    print(f"{self.name} is immobilized by love!")
+                    self.failed_attract = True
+                    scene.pre_message_queue.append(f"{self.name} is immobilized by love!")
+                    return True
+            if status == StatusEffect.SLEEP:
+                if self.sleep_duration > 0:
+                    self.sleep_duration -= 1
+                if self.sleep_duration == 0:
+                    self.failed_sleep = True
+                    return True
+                
+        return False
+
+    def execute_status_failure(self, scene) -> str:
+        for status in self.status_effects:
+            if status == StatusEffect.PARALYZE:
+                roll = random.randint(1,100)
+                if roll <= 25:
+                    scene.pre_message_queue.append(f"{self.name} is paralyzed! It can't move!")
+                    return True
+            if status == StatusEffect.CONFUSE:
+                roll = random.randint(1, 100)
+                print(f"{self.name} is confused!")
+                if roll <= 33:
+                    scene.pre_message_queue.append(f"{self.name} hurt itself in its confusion!")
+                    self.confusion_self_damage()
+                    return True
+            if status == StatusEffect.FREEZE:
+                scene.pre_message_queue.append(f"{self.name} is frozen solid!")
+                return True
+            if status == StatusEffect.ATTRACT:
+                scene.pre_message_queue.append(f"{self.name} is in love!")
+                roll = random.randint(1, 100)
+                if roll <= 50:
+                    scene.pre_message_queue.append(f"{self.name} is immobilized by love!")
                     return True
         return False
+
+    def status_failed(self) -> bool:
+        return self.failed_attract or self.failed_confusion or self.failed_frozen or self.failed_paralyze or self.failed_sleep
 
     def confusion_self_damage(self):
         damage_base = 42
