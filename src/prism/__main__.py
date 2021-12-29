@@ -71,6 +71,34 @@ async def game_loop(scene_manager: SceneManager,
             scene_manager.current_scene.check_for_player_movement()
             scene_manager.current_scene.check_for_actor_movement()
             scene_manager.current_scene.full_render()
+        elif scene_manager.current_scene == scene_manager.battle:
+            if scene_manager.current_scene.enemy_ticking_health or scene_manager.current_scene.player_ticking_health:
+                p_poke = scene_manager.current_scene.player_pokemon
+                e_poke = scene_manager.current_scene.enemy_pokemon
+                if p_poke.display_hp > p_poke.current_hp:
+                    p_poke.display_hp -= 1
+                elif p_poke.display_hp < p_poke.current_hp:
+                    p_poke.display_hp += 1
+                
+                if e_poke.display_hp > e_poke.current_hp:
+                    e_poke.display_hp -= 1
+                elif e_poke.display_hp < e_poke.current_hp:
+                    e_poke.display_hp += 1
+
+                if e_poke.current_hp == e_poke.display_hp:
+                    scene_manager.current_scene.enemy_ticking_health = False
+                if p_poke.current_hp == p_poke.display_hp:
+                    scene_manager.current_scene.player_ticking_health = False
+                
+                scene_manager.current_scene.render_player_pokemon_info_region()
+                scene_manager.current_scene.render_enemy_pokemon_info_region()
+                if scene_manager.current_scene.enemy_ticking_health == False and scene_manager.current_scene.player_ticking_health == False:
+                    scene_manager.current_scene.render_battle_regions()
+            if scene_manager.current_scene.printing and scene_manager.current_scene.message_queue:
+                scene_manager.current_scene.render_battle_info_region()
+            elif scene_manager.current_scene.executing_turn:
+                scene_manager.current_scene.execution_loop()
+            
         scene_manager.spriterenderer.render(
             scene_manager.renderables())
         window.refresh()

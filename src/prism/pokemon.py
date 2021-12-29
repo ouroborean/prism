@@ -90,6 +90,7 @@ class Pokemon:
     abilities: list[Ability]
     status_effects: dict[StatusEffect, int]
     current_hp: int
+    display_hp: int
     passive_pool: Tuple[Passive]
     passive: Passive
     decision: int
@@ -176,6 +177,7 @@ class Pokemon:
             Stat.HP: 0
         }
         self.current_hp = self.get_stat(Stat.HP)
+        self.display_hp = self.get_stat(Stat.HP)
 
     def get_database_name(self, name:str) -> str:
         for char in name:
@@ -194,6 +196,7 @@ class Pokemon:
     def set_level(self, level: int):
         self.level = level
         self.current_hp = self.get_stat(Stat.HP)
+        self.display_hp = self.get_stat(Stat.HP)
 
     def describe(self):
         print(f"{self.name}")
@@ -291,7 +294,7 @@ class Pokemon:
                         for effect in abi.atype[AbilityType.SELF_BOOST]:
                             self.apply_boost(self, effect, scene)
             else:
-                scene.message_queue.append(f"It doesn't affect the enemy {enemy.name}!")
+                scene.message(f"It doesn't affect the enemy {enemy.name}!")
         elif abi.target == TargetingType.SELF:
             if AbilityType.DAMAGE in abi.atype:
                 for effect in abi.atype[AbilityType.DAMAGE]:
@@ -327,7 +330,7 @@ class Pokemon:
         if target.current_hp > target.get_stat(Stat.HP):
             target.current_hp = target.get_stat(Stat.HP)
         
-        scene.message_queue.append(f"{target.name} had its HP restored!")
+        scene.message(f"{target.name} had its HP restored!")
 
     def set_battleslot(self, battle_slot: "BattleSlot"):
         self.battle_slot = battle_slot
@@ -338,11 +341,11 @@ class Pokemon:
 
         for eff in target.battle_slot.effects:
             if eff.effect_type == effect.effect_type:
-                scene.message_queue.append("It failed!")
+                scene.message("It failed!")
                 return
 
         target.battle_slot.add_effect(effect)
-        scene.message_queue.append(activation_string)
+        scene.message(activation_string)
 
     def apply_boost(self, target: "Pokemon", abi_details: list, scene: "BattleScene"):
         chance = abi_details[0]
@@ -354,9 +357,9 @@ class Pokemon:
         if roll <= chance:
             for boost in boost_type:
                 if boost_mag < 0:
-                    scene.message_queue.append(f"{target.name}'s {boost.name} {boost_mag * -1}!")
+                    scene.message(f"{target.name}'s {boost.name} {boost_mag * -1}!")
                 else:
-                    scene.message_queue.append(f"{target.name}'s {boost.name} {boost_mag}!")
+                    scene.message(f"{target.name}'s {boost.name} {boost_mag}!")
                 target.receive_boost(boost, boost_mag)
 
     def pre_check_for_status_failure(self, scene: "BattleScene") -> bool:
@@ -365,11 +368,11 @@ class Pokemon:
                 roll = random.randint(1,100)
                 if roll <= 25:
                     self.failed_paralyze = True
-                    scene.message_queue.append(f"{self.name} is paralyzed! It can't move!")
+                    scene.message(f"{self.name} is paralyzed! It can't move!")
                     return True
             if status == StatusEffect.CONFUSE:
                 roll = random.randint(1, 100)
-                scene.message_queue.append(f"{self.name} is confused!")
+                scene.message(f"{self.name} is confused!")
                 if roll <= 33:
                     self.failed_confusion = True
                     return True
@@ -378,7 +381,7 @@ class Pokemon:
                     self.failed_frozen = True
                     return True
             if status == StatusEffect.ATTRACT:
-                scene.message_queue.append(f"{self.name} is in love!")
+                scene.message(f"{self.name} is in love!")
                 roll = random.randint(1, 100)
                 if roll <= 50:
                     self.failed_attract = True
@@ -394,16 +397,18 @@ class Pokemon:
 
     def execute_status_failure(self, scene: "BattleScene"):
         if self.failed_paralyze:
-            scene.message_queue.append(f"{self.name} is paralyzed! It can't move!")
+            scene.message(f"{self.name} is paralyzed! It can't move!")
         elif self.failed_frozen:
-            scene.message_queue.append(f"{self.name} is frozen solid!")
+            scene.message(f"{self.name} is frozen solid!")
         elif self.failed_sleep:
-            scene.message_queue.append(f"{self.name} is fast asleep!")
+            scene.message(f"{self.name} is fast asleep!")
         elif self.failed_confusion:
-            scene.message_queue.append(f"{self.name} hurt itself in its confusion!")
+            scene.message(f"{self.name} hurt itself in its confusion!")
+            scene.enemy_ticking_health = True
+            scene.player_ticking_health = True
             self.confusion_self_damage()
         elif self.failed_attract:
-            scene.message_queue.append(f"{self.name} is immobilized by love!")
+            scene.message(f"{self.name} is immobilized by love!")
       
 
     def status_failed(self) -> bool:
@@ -430,7 +435,7 @@ class Pokemon:
             return True
 
     def burn_tick(self, scene: "BattleScene"):
-        scene.message_queue.append(f"{self.name} was hurt by its burn!")
+        scene.message(f"{self.name} was hurt by its burn!")
         burn_damage = self.get_stat(Stat.HP) // 16
         self.current_hp -= burn_damage
         if self.current_hp < 0:
@@ -438,7 +443,7 @@ class Pokemon:
             self.fainted = True
 
     def poison_tick(self, scene: "BattleScene"):
-        scene.message_queue.append(f"{self.name} was hurt by poison!")
+        scene.message(f"{self.name} was hurt by poison!")
         poison_damage = self.get_stat(Stat.HP) // 16
         self.current_hp -= poison_damage
         if self.current_hp < 0:
@@ -455,10 +460,10 @@ class Pokemon:
                 roll = random.randint(1,100)
                 if roll <= chance:
                     if is_greater_status(status) and target.contains_greater_status():
-                        scene.message_queue.append(f"{target.name} is already afflicted!")
+                        scene.message(f"{target.name} is already afflicted!")
                     else:
                         target.receive_status(status)
-                        scene.message_queue.append(status_applied(target,status))
+                        scene.message(status_applied(target,status))
                         return
 
     def contains_greater_status(self) -> bool:
@@ -520,7 +525,7 @@ class Pokemon:
             if hit_roll <= accuracy_range:
                 return True
             else:
-                scene.message_queue.append(f"{self.name}'s attack missed!")
+                scene.message(f"{self.name}'s attack missed!")
                 return False
         return True
 
@@ -553,8 +558,9 @@ class Pokemon:
         if crit_roll == 1:
             crit = True
 
-        #Base damage magic numbers
-        damage_base = 42
+        damage_base = self.level * 2
+        damage_base = damage_base // 5
+        damage_base += 2
         damage_base = damage_base * power
         if not crit:
             attack_defense = self.get_stat(off_stat) / target.get_stat(def_stat)
@@ -571,23 +577,36 @@ class Pokemon:
         damage_roll = (100 - random.randint(0, 15)) / 100
         damage_base = int(damage_base * damage_roll)
 
+        effective = 0
         
-        
+        if used_ability.ptype in self.types:
+            damage_base = damage_base * 1.5
+
         for type in target.types:
             if used_ability.ptype in ptypes.strong_against[type]:
                 damage_base = int(damage_base * .5)
+                effective = -1
             if used_ability.ptype in ptypes.weak_against[type]:
                 damage_base = int(damage_base * 2)
+                effective = 1
         
         #Burn modification
         if off_stat == Stat.ATK and self.has_status(StatusEffect.BURN):
             damage_base = damage_base // 2
         
         if crit:
-            scene.message_queue.append("A critical hit!")
+            scene.message("A critical hit!")
+        
+        if effective > 0:
+            scene.message("It's super effective!")
+        elif effective < 0:
+            scene.message("It's not very effective. . .")
+
         target.receive_damage(damage_base)
-        scene.message_queue.append(f"{self.name} was damaged by recoil!")
+        scene.message(f"{self.name} was damaged by recoil!")
         self.receive_damage(int(damage_base * (recoil / 100)))
+        scene.enemy_ticking_health = True
+        scene.player_ticking_health = True
 
     def damage(self, target: "Pokemon", used_ability: Ability, abi_details: list, scene: "BattleScene"):
         
@@ -614,7 +633,9 @@ class Pokemon:
         if crit_roll == 1:
             crit = True
 
-        damage_base = 42
+        damage_base = self.level * 2
+        damage_base = damage_base // 5
+        damage_base += 2
         damage_base = damage_base * power
         if not crit:
             attack_defense = self.get_stat(off_stat) / target.get_stat(def_stat)
@@ -629,21 +650,35 @@ class Pokemon:
         damage_roll = (100 - random.randint(0, 15)) / 100
         damage_base = int(damage_base * damage_roll)
 
+        effective = 0
         
-        
+        if used_ability.ptype in self.types:
+            damage_base = damage_base * 1.5
+
         for type in target.types:
             if used_ability.ptype in ptypes.strong_against[type]:
                 damage_base = int(damage_base * .5)
+                effective = -1
             if used_ability.ptype in ptypes.weak_against[type]:
                 damage_base = int(damage_base * 2)
+                effective = 1
         
         #Burn modification
         if off_stat == Stat.ATK and self.has_status(StatusEffect.BURN):
             damage_base = damage_base // 2
 
+        print(damage_base)
+
+        if effective > 0:
+            scene.message("It's super effective!")
+        elif effective < 0:
+            scene.message("It's not very effective. . .")
+
         if crit:
-            scene.message_queue.append("A critical hit!")
+            scene.message("A critical hit!")
         target.receive_damage(damage_base)
+        scene.enemy_ticking_health = True
+        scene.player_ticking_health = True
 
         
         

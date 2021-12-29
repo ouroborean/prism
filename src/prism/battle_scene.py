@@ -40,7 +40,7 @@ def init_font(size: int):
                                   FONT_FILENAME) as path:
         return sdl2.sdlttf.TTF_OpenFont(str.encode(os.fspath(path)), size)
 
-test_trainer = Trainer("Test Trainer", [pokespawn("mismagius", 50),])
+test_trainer = Trainer("Test Trainer", [pokespawn("mismagius", 15, ["shadow_ball", "flamethrower"]),])
 
 class BattleSlot:
     active_pokemon: "Pokemon"
@@ -148,6 +148,13 @@ class BattleScene(engine.Scene):
     message_queue: list[str]
     acting_list: list["Pokemon"]
     current_phase: BattlePhase
+    player_ticking_health: bool
+    enemy_ticking_health: bool
+    executing_turn: bool
+    printing: bool
+    characters_printed: int
+    lines_printed: int
+    lines_to_print: int
 
     def __init__(self, scene_manager, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -156,12 +163,19 @@ class BattleScene(engine.Scene):
         self.selecting_ability = False
         self.selecting_pokemon = False
         self.checking_trainer = False
+        self.player_ticking_health = False
+        self.enemy_ticking_health = False
+        self.executing_turn = False
+        self.printing = False
         self.battle_info_string = ""
         self.message_queue = []
         self.scene_manager = scene_manager
         self.current_phase = BattlePhase.ACTION_SELECTION
         self.selected_action = 0
         self.selected_ability = 0
+        self.characters_printed = 0
+        self.lines_printed = 0
+        self.lines_to_print = 0
         self.trainer = test_trainer
         self.enemy_pokemon = self.trainer.team[0]
         self.enemy_pokemon_region = self.region.subregion(400, 0, 400, 350)
@@ -176,8 +190,8 @@ class BattleScene(engine.Scene):
         self.hp_font = init_font(HEALTH_FONT_SIZE)
         self.menu_font = init_font(MENU_FONT_SIZE)
         self.ability_font = init_font(ABILITY_FONT_SIZE)
-        self.player_pokemon = Pokemon(*poke_db["hitmontop"])
-        self.player_pokemon.set_level(10)
+        self.player_pokemon = Pokemon(*poke_db["mudkip"])
+        self.player_pokemon.set_level(5)
         self.player_pokemon.learn_ability(abi_db["fire_punch"])
         self.player_pokemon.learn_ability(abi_db["ice_punch"])
         self.player_pokemon.learn_ability(abi_db["thunder_punch"])
@@ -208,6 +222,10 @@ class BattleScene(engine.Scene):
     def render_player_regions(self):
         self.render_player_pokemon_region()
         self.render_player_pokemon_info_region()
+
+    def message(self, message: str):
+        self.message_queue.append(message)
+        self.printing = True
 
     def toggle_state(self, action: Action = None):
         if action == Action.FIGHT:
@@ -252,17 +270,17 @@ class BattleScene(engine.Scene):
         sdl2.surface.SDL_BlitSurface(level_text, None, nameplate.surface, sdl2.SDL_Rect(310, 13, 0, 0))
         sdl2.SDL_FreeSurface(level_text)
 
-        health_text = sdl2.sdlttf.TTF_RenderText_Blended(self.name_font, str.encode(f"{int(self.player_pokemon.current_hp)}/{int(self.player_pokemon.get_stat(Stat.HP))}"), BLACK)
+        health_text = sdl2.sdlttf.TTF_RenderText_Blended(self.name_font, str.encode(f"{int(self.player_pokemon.display_hp)}/{int(self.player_pokemon.get_stat(Stat.HP))}"), BLACK)
         sdl2.surface.SDL_BlitSurface(health_text, None, nameplate.surface, sdl2.SDL_Rect(240, 83, 0, 0))
         sdl2.SDL_FreeSurface(health_text)
 
-        health_check = self.player_pokemon.current_hp / self.player_pokemon.get_stat(Stat.HP)
+        health_check = self.player_pokemon.display_hp / self.player_pokemon.get_stat(Stat.HP)
         if health_check < .01 and health_check > 0:
             health_percent = .01
         elif health_check > .99 and health_check < 1:
             health_percent = .99
         else:
-            health_percent = round(self.player_pokemon.current_hp / self.player_pokemon.get_stat(Stat.HP), 2)
+            health_percent = round(self.player_pokemon.display_hp / self.player_pokemon.get_stat(Stat.HP), 2)
         
         health_bar_width = int(health_percent * 200)
 
@@ -295,13 +313,13 @@ class BattleScene(engine.Scene):
 
         self.enemy_pokemon_info_region.add_sprite(nameplate, 30, 50)
 
-        health_check = self.enemy_pokemon.current_hp / self.enemy_pokemon.get_stat(Stat.HP)
+        health_check = self.enemy_pokemon.display_hp / self.enemy_pokemon.get_stat(Stat.HP)
         if health_check < .01 and health_check > 0:
             health_percent = .01
         elif health_check > .99 and health_check < 1:
             health_percent = .99
         else:
-            health_percent = round(self.enemy_pokemon.current_hp / self.enemy_pokemon.get_stat(Stat.HP), 2)
+            health_percent = round(self.enemy_pokemon.display_hp / self.enemy_pokemon.get_stat(Stat.HP), 2)
         
         health_bar_width = int(health_percent * 200)
 
@@ -312,10 +330,11 @@ class BattleScene(engine.Scene):
     def render_battle_regions(self):
 
         self.render_battle_info_region()
-        if self.selecting_action:
+        if self.selecting_action and not self.enemy_ticking_health and not self.player_ticking_health:
             self.render_battle_options_region()
 
     def render_battle_info_region(self):
+        
         self.battle_info_region.clear()
         outer_box = self.sprite_factory.from_color(AQUA, self.battle_info_region.size())
         inner_box = self.sprite_factory.from_color(WHITE, (outer_box.size[0] - 18, outer_box.size[1] - 18))
@@ -323,20 +342,42 @@ class BattleScene(engine.Scene):
         info_to_render = ()
         if not self.selecting_ability or self.selecting_pokemon or self.checking_trainer:
             if self.current_phase == BattlePhase.ACTION_SELECTION:
-                lines = ["What will", f"{self.player_pokemon.name} do?"]
+                self.lines_to_print = ["What will",  f"{self.player_pokemon.name} do?"]
                 max_width = 460
-            else:
-                max_width = 730
-                if self.message_queue:
-                    self.battle_info_string = self.message_queue[0]
-                lines = text_formatter.get_lines(self.battle_info_string, max_width, MENU_FONT_SIZE)
+            elif self.message_queue and not (self.player_ticking_health or self.enemy_ticking_health):
+                max_width = 690
+                self.lines_to_print = text_formatter.get_lines(self.message_queue[0], max_width, MENU_FONT_SIZE)
             outer_box = self.sprite_factory.from_color(AQUA, self.battle_info_region.size())
             inner_box = self.sprite_factory.from_color(WHITE, (outer_box.size[0] - 18, outer_box.size[1] - 18))
 
-            for row, line in enumerate(lines):
-                battle_info_text = sdl2.sdlttf.TTF_RenderText_Blended(self.menu_font, str.encode(line), BLACK)
-                sdl2.surface.SDL_BlitSurface(battle_info_text, None, inner_box.surface, sdl2.SDL_Rect(15, 15 + (row * 90), 0, 0))
-                sdl2.SDL_FreeSurface(battle_info_text)
+            if self.current_phase == BattlePhase.ACTION_SELECTION:
+                for row, line in enumerate(self.lines_to_print):
+                    text_surface = sdl2.sdlttf.TTF_RenderText_Blended(self.menu_font, str.encode(line), BLACK)
+                    sdl2.surface.SDL_BlitSurface(text_surface, None, inner_box.surface, sdl2.SDL_Rect(15, 15 + (row * 80), 0, 0))
+                    sdl2.SDL_FreeSurface(text_surface)
+            else:
+                for row, line in enumerate(self.lines_to_print):
+                    if row < self.lines_printed:
+                        text_surface = sdl2.sdlttf.TTF_RenderText_Blended(self.menu_font, str.encode(line), BLACK)
+                        sdl2.surface.SDL_BlitSurface(text_surface, None, inner_box.surface, sdl2.SDL_Rect(15, 15 + (row * 80), 0, 0))
+                        sdl2.SDL_FreeSurface(text_surface)
+                    elif row == self.lines_printed:
+                        characters_to_print = len(line)
+                        text_surface = sdl2.sdlttf.TTF_RenderText_Blended(self.menu_font, str.encode(line[:self.characters_printed]), BLACK)
+                        sdl2.surface.SDL_BlitSurface(text_surface, None, inner_box.surface, sdl2.SDL_Rect(15, 15 + (row * 80), 0, 0))
+                        sdl2.SDL_FreeSurface(text_surface)
+                        self.characters_printed += 1
+                        if self.characters_printed > characters_to_print:
+                            self.lines_printed += 1
+                            if self.lines_printed >= len(self.lines_to_print):
+                                self.lines_printed = 0
+                                self.characters_printed = 0
+                                self.message_queue = self.message_queue[1:]
+                                if not self.message_queue:
+                                    self.lines_to_print = []
+                                    self.printing = False
+                            self.characters_printed = 0
+
         elif self.selecting_ability:
             for i, ability in enumerate(self.player_pokemon.abilities):
                 ability_button = self.sprite_factory.from_surface(self.get_scaled_surface(ability.ability_plate))
@@ -447,118 +488,20 @@ class BattleScene(engine.Scene):
         self.full_render()
 
     def pressed_confirm(self):
-        if self.selecting_action:
-            self.toggle_state(Action(self.selected_action))
-        elif self.selecting_pokemon:
-            self.enemy_pokemon.current_hp = self.enemy_pokemon.get_stat(Stat.HP)
-            self.toggle_state()
-        elif self.selecting_ability:
-            #TODO catch ability failstates (Disable, Torment, Taunt, No PP)
-            if True:
-                self.selecting_ability = False
-                self.player_pokemon.decision = self.selected_ability
-                self.current_phase = BattlePhase.FIRST_ACTION_DESCRIPTION
-                self.start_turn()
-        elif self.current_phase == BattlePhase.FIRST_ACTION_DESCRIPTION:
-            if self.message_queue:
-                self.message_queue = self.message_queue[1:]
-            if len(self.message_queue) == 0:
-                self.execute_action(self.acting_list[0])
-                if self.message_queue:
-                    self.current_phase = BattlePhase.FIRST_ACTION_EXECUTION
-                else:
-                    self.interim_check()
-                    if self.message_queue:
-                        self.current_phase = BattlePhase.INTERIM_CHECK
-                    else:
-                        self.current_phase = BattlePhase.SECOND_ACTION_DESCRIPTION
-                        pokemon = self.acting_list[1]
-                        if pokemon == self.player_pokemon:
-                            if pokemon.decision < 4:
-                                self.pre_ability_execution(pokemon)
-                            else:
-                                self.pre_pokemon_change(pokemon)
-                        elif pokemon == self.enemy_pokemon:
-                            if pokemon.decision < 4:
-                                self.pre_ability_execution(pokemon)
-                            elif pokemon.decision == 10:
-                                self.message_queue.append(f"{pokemon.name} didn't do anything!")
-                            else:
-                                self.pre_pokemon_change(pokemon)
-        elif self.current_phase == BattlePhase.FIRST_ACTION_EXECUTION:
-            if self.message_queue:
-                self.message_queue = self.message_queue[1:]
-            if len(self.message_queue) == 0:
-                self.interim_check()
-                if self.message_queue:
-                    self.current_phase = BattlePhase.INTERIM_CHECK
-                else:
-                    self.current_phase = BattlePhase.SECOND_ACTION_DESCRIPTION
-                    pokemon = self.acting_list[1]
-                    if pokemon == self.player_pokemon:
-                        if pokemon.decision < 4:
-                            self.pre_ability_execution(pokemon)
-                        else:
-                            self.pre_pokemon_change(pokemon)
-                    elif pokemon == self.enemy_pokemon:
-                        if pokemon.decision < 4:
-                            self.pre_ability_execution(pokemon)
-                        elif pokemon.decision == 10:
-                            self.message_queue.append(f"{pokemon.name} didn't do anything!")
-                        else:
-                            self.pre_pokemon_change(pokemon)
-        elif self.current_phase == BattlePhase.INTERIM_CHECK:
-            if self.message_queue:
-                self.message_queue = self.message_queue[1:]
-            if len(self.message_queue) == 0:
-                self.current_phase = BattlePhase.SECOND_ACTION_DESCRIPTION
-                pokemon = self.acting_list[1]
-                if pokemon == self.player_pokemon:
-                    if pokemon.decision < 4:
-                        self.pre_ability_execution(pokemon)
-                    else:
-                        self.pre_pokemon_change(pokemon)
-                elif pokemon == self.enemy_pokemon:
-                    if pokemon.decision < 4:
-                        self.pre_ability_execution(pokemon)
-                    elif pokemon.decision == 10:
-                        self.message_queue.append(f"{pokemon.name} didn't do anything!")
-                    else:
-                        self.pre_pokemon_change(pokemon)
-        elif self.current_phase == BattlePhase.SECOND_ACTION_DESCRIPTION:
-            if self.message_queue:
-                self.message_queue = self.message_queue[1:]
-            if len(self.message_queue) == 0:
-                self.execute_action(self.acting_list[1])
-                if self.message_queue:
-                    self.current_phase = BattlePhase.SECOND_ACTION_EXECUTION
-                else:
-                    self.turn_end_check()
-                    if self.message_queue:
-                        self.current_phase = BattlePhase.TURN_END_CHECK
-                    else:
-                        self.current_phase = BattlePhase.ACTION_SELECTION
-                        self.toggle_state()
-        elif self.current_phase == BattlePhase.SECOND_ACTION_EXECUTION:
-            if self.message_queue:
-                self.message_queue = self.message_queue[1:]
-            if len(self.message_queue) == 0:
-                self.turn_end_check()
-                if self.message_queue:
-                    self.current_phase = BattlePhase.TURN_END_CHECK
-                else:
-                    self.current_phase = BattlePhase.ACTION_SELECTION
-                    self.toggle_state()
-                #TODO Turn End Check
-        elif self.current_phase == BattlePhase.TURN_END_CHECK:
-            if self.message_queue:
-                self.message_queue = self.message_queue[1:]
-            if len(self.message_queue) == 0:
-                self.current_phase = BattlePhase.ACTION_SELECTION
+        if not self.player_ticking_health and not self.enemy_ticking_health:
+            if self.selecting_action:
+                self.toggle_state(Action(self.selected_action))
+            elif self.selecting_pokemon:
+                self.enemy_pokemon.current_hp = self.enemy_pokemon.get_stat(Stat.HP)
                 self.toggle_state()
-
-
-        
+            elif self.selecting_ability:
+                #TODO catch ability failstates (Disable, Torment, Taunt, No PP)
+                if True:
+                    self.selecting_ability = False
+                    self.player_pokemon.decision = self.selected_ability
+                    self.current_phase = BattlePhase.FIRST_ACTION_DESCRIPTION
+                    self.start_turn()
+                    
 
         self.full_render()
 
@@ -575,16 +518,49 @@ class BattleScene(engine.Scene):
             return self.player_pokemon
 
     def start_turn(self):
-        #TODO generate opponent decision
+        self.get_enemy_decision()
         self.acting_list = self.speed_order(self.player_pokemon, self.enemy_pokemon)
-        pokemon = self.acting_list[0]
+        self.pre_check(self.acting_list[0])
+        
+        self.executing_turn = True
+    
+    def execution_loop(self):
+        
+        if self.current_phase == BattlePhase.FIRST_ACTION_DESCRIPTION:
+            if not self.message_queue:
+                self.execute_action(self.acting_list[0])
+                self.current_phase = BattlePhase.FIRST_ACTION_EXECUTION
+        elif self.current_phase == BattlePhase.FIRST_ACTION_EXECUTION:
+            if not self.message_queue:
+                self.interim_check()
+                self.current_phase = BattlePhase.INTERIM_CHECK
+        elif self.current_phase == BattlePhase.INTERIM_CHECK:
+            if not self.message_queue:
+                self.pre_check(self.acting_list[1])
+                self.current_phase = BattlePhase.SECOND_ACTION_DESCRIPTION
+        elif self.current_phase == BattlePhase.SECOND_ACTION_DESCRIPTION:
+            if not self.message_queue:
+                self.execute_action(self.acting_list[1])
+                self.current_phase = BattlePhase.SECOND_ACTION_EXECUTION
+        elif self.current_phase == BattlePhase.SECOND_ACTION_EXECUTION:
+            if not self.message_queue:
+                self.turn_end_check()
+                self.current_phase = BattlePhase.TURN_END_CHECK
+        elif self.current_phase == BattlePhase.TURN_END_CHECK:
+            if not self.message_queue:
+                self.toggle_state()
+                self.executing_turn = False
+                self.current_phase = BattlePhase.ACTION_SELECTION
+
+    
+    def pre_check(self, pokemon: "Pokemon"):
         if pokemon.decision < 4:
             self.pre_ability_execution(pokemon)
         elif pokemon.decision == 10:
-            self.message_queue.append(f"{pokemon.name} didn't do anything!")
+            self.message(f"{pokemon.name} didn't do anything!")
         else:
             self.pre_pokemon_change(pokemon)
-        
+
     def interim_check(self):
         pass
 
@@ -592,26 +568,37 @@ class BattleScene(engine.Scene):
         
         if StatusEffect.BURN in self.player_pokemon.status_effects:
             self.player_pokemon.burn_tick(self)
+            self.player_ticking_health = True
         if StatusEffect.POISON in self.player_pokemon.status_effects:
             self.player_pokemon.poison_tick(self)
+            self.player_ticking_health = True
         
 
         if StatusEffect.BURN in self.enemy_pokemon.status_effects:
             self.enemy_pokemon.burn_tick(self)
+            self.enemy_ticking_health = True
         if StatusEffect.POISON in self.enemy_pokemon.status_effects:
             self.enemy_pokemon.poison_tick(self)
+            self.enemy_ticking_health = True
 
 
     def pre_pokemon_change(self, pokemon: "Pokemon"):
 
         if pokemon == self.player_pokemon:
-            self.message_queue.append(f"{pokemon.name} switched out to {self.player.team[pokemon.decision - 4]}!")
+            self.message(f"{pokemon.name} switched out to {self.player.team[pokemon.decision - 4]}!")
         else:
-            self.message_queue.append(f"{pokemon.name} switched out to {self.trainer.team[pokemon.decision - 4]}!")
+            self.message(f"{pokemon.name} switched out to {self.trainer.team[pokemon.decision - 4]}!")
         
     def pre_ability_execution(self, pokemon: "Pokemon"):
         if not pokemon.pre_check_for_status_failure(self):
-            self.message_queue.append(f"{pokemon.name} used {pokemon.abilities[pokemon.decision].name}!")
+            self.message(f"{pokemon.name} used {pokemon.abilities[pokemon.decision].name}!")
+
+    def get_enemy_decision(self):
+
+        rand_range = len(self.enemy_pokemon.abilities)
+        roll = random.randint(1, rand_range)
+
+        self.enemy_pokemon.decision = roll - 1
 
     def execute_action(self, pokemon: "Pokemon"):
         if pokemon == self.player_pokemon:
