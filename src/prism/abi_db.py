@@ -16,7 +16,7 @@ def initialize_abilities() -> dict[str, Ability]:
     #ability_db["comet_punch"] = Ability("Comet Punch", PokemonType.NORMAL, 85, 15, 0, TargetingType.ENEMY, (AbilityType.DAMAGE,), ((18, Stat.ATK, Stat.DEF),), TAGS)
     ability_db["mega_punch"] = Ability("Mega Punch", PokemonType.NORMAL, 85, 20, 0, TargetingType.ENEMY, (AbilityType.DAMAGE,), ((80, Stat.ATK, Stat.DEF),), "punch")
     ability_db["pay_day"] = Ability("Pay Day", PokemonType.NORMAL, 100, 20, 0, TargetingType.ENEMY, (AbilityType.DAMAGE,), ((40, Stat.ATK, Stat.DEF),))
-    ability_db["fire_punch"] = Ability("Fire Punch", PokemonType.FIRE, 100, 15, 0, TargetingType.ENEMY, (AbilityType.DAMAGE, AbilityType.TARGET_STATUS), ((75, Stat.ATK, Stat.DEF),(10, (StatusEffect.BURN,))), "punch")
+    ability_db["fire_punch"] = Ability("Fire Punch", PokemonType.FIRE, 100, 15, 0, TargetingType.ENEMY, (AbilityType.DAMAGE, AbilityType.TARGET_STATUS), ((75, Stat.ATK, Stat.DEF),(75, (StatusEffect.BURN,))), "punch")
     ability_db["ice_punch"] = Ability("Ice Punch", PokemonType.ICE, 100, 15, 0, TargetingType.ENEMY, (AbilityType.DAMAGE,AbilityType.TARGET_STATUS), ((75, Stat.ATK, Stat.DEF),(10, (StatusEffect.FREEZE,))), "punch")
     ability_db["thunder_punch"] = Ability("Thunder Punch", PokemonType.ELECTRIC, 100, 15, 0, TargetingType.ENEMY, (AbilityType.DAMAGE,AbilityType.TARGET_STATUS), ((75, Stat.ATK, Stat.DEF),(10, (StatusEffect.PARALYZE,))), "punch")  
     ability_db["scratch"] = Ability("Scratch", PokemonType.NORMAL, 100, 35, 0, TargetingType.ENEMY, (AbilityType.DAMAGE,), ((40, Stat.ATK, Stat.DEF),))

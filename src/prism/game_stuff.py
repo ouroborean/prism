@@ -48,6 +48,8 @@ def tick_post_turn_effects(battle: Battle):
     for battle_slot in battle.battle_slots:
         if StatusEffect.BURN in battle_slot.active_pokemon.status_effects:
             battle_slot.active_pokemon.burn_tick()
+        if StatusEffect.POISON in pokemon.status_effects:
+            pokemon.poison_tick()
 
 def speed_order(pokemon1: pokemon.Pokemon, pokemon2: pokemon.Pokemon) -> list[pokemon.Pokemon]:
     if pokemon1.using_ability() and pokemon2.using_ability():

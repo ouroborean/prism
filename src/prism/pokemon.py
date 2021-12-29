@@ -16,6 +16,7 @@ from prism.poke_db import initialize_pokemon
 
 if typing.TYPE_CHECKING:
     from prism.battle import BattleSlot
+    from prism.battle_scene import BattleScene
 
 def get_image_from_path(file_name: str) -> Image:
     with importlib.resources.path('prism.resources', file_name) as path:
@@ -42,6 +43,18 @@ def pokespawn(database_name: str, level: int, moveset: list[str] = [], wild: boo
             pokemon.learn_ability(adb[move])
 
     return pokemon
+
+stat_mod_strings = {
+
+    1: "rose!",
+    2: "sharply rose!",
+    3: "drastically rose!",
+    6: "was maximized!",
+    -1: "fell!",
+    -2: "harshly fell!",
+    -3: "drastically fell!"
+
+}
 
 natures = {
     "Serious": (None),
@@ -212,7 +225,7 @@ class Pokemon:
         return active_pokemon[0]
 
     def get_crit_stat(self, stat: Stat) -> int:
-        mod_stat = 2 * self.base_stats[stat] + self.iv[stat] + self.ev[stat]//4
+        mod_stat = (.01 * (2 * self.base_stats[stat] + self.iv[stat] + (self.ev[stat]//4)) * self.level)
         mod_stat += 5
         if natures[self.nature] is not None:
             if natures[self.nature][0] == stat:
@@ -254,58 +267,57 @@ class Pokemon:
                 return True
         return False
 
-    def execute_ability(self, enemy: "Pokemon", abi: Ability):
-        print(f"{self.name} used {abi.name}!")
+    def execute_ability(self, enemy: "Pokemon", abi: Ability, scene: "BattleScene"):
         if abi.target == TargetingType.ENEMY:
             immune_check = False
             for ptype in enemy.types:
                 if ptype in ptypes.immune_to and abi.ptype in ptypes.immune_to[ptype]:
                     immune_check = True
             if not immune_check:
-                if self.miss_check(enemy, abi):
+                if self.miss_check(enemy, abi, scene):
                     if AbilityType.DAMAGE in abi.atype:
                         for effect in abi.atype[AbilityType.DAMAGE]:
-                            self.damage(enemy, abi, effect)
+                            self.damage(enemy, abi, effect, scene)
                     if AbilityType.TARGET_STATUS in abi.atype:
                         for effect in abi.atype[AbilityType.TARGET_STATUS]:
-                            self.apply_status(enemy, effect)
+                            self.apply_status(enemy, effect, scene)
                     if AbilityType.SELF_STATUS in abi.atype:
                         for effect in abi.atype[AbilityType.SELF_STATUS]:
-                            self.apply_status(self, effect)
+                            self.apply_status(self, effect, scene)
                     if AbilityType.TARGET_BOOST in abi.atype:
                         for effect in abi.atype[AbilityType.TARGET_BOOST]:
-                            self.apply_boost(enemy, effect)
+                            self.apply_boost(enemy, effect, scene)
                     if AbilityType.SELF_BOOST in abi.atype:
                         for effect in abi.atype[AbilityType.SELF_BOOST]:
-                            self.apply_boost(self, effect)
+                            self.apply_boost(self, effect, scene)
             else:
-                print(f"It doesn't affect the enemy {enemy.name}!")
+                scene.message_queue.append(f"It doesn't affect the enemy {enemy.name}!")
         elif abi.target == TargetingType.SELF:
             if AbilityType.DAMAGE in abi.atype:
                 for effect in abi.atype[AbilityType.DAMAGE]:
-                    self.damage(self, abi, effect)
+                    self.damage(self, abi, effect, scene)
             if AbilityType.SELF_STATUS in abi.atype:
                 for effect in abi.atype[AbilityType.SELF_STATUS]:
-                    self.apply_status(self, effect)
+                    self.apply_status(self, effect, scene)
             if AbilityType.SELF_BOOST in abi.atype:
                 for effect in abi.atype[AbilityType.SELF_BOOST]:
-                    self.apply_boost(self, effect)
+                    self.apply_boost(self, effect, scene)
             if AbilityType.HEALING in abi.atype:
                 for effect in abi.atype[AbilityType.HEALING]:
-                    self.apply_healing(self, effect)
+                    self.apply_healing(self, effect, scene)
         elif abi.target == TargetingType.ENEMY_BATTLEZONE:
             if AbilityType.ENEMY_BATTLEZONE in abi.atype:
                 for effect in abi.atype[AbilityType.ENEMY_BATTLEZONE]:
-                    self.apply_battlezone_effect(enemy, effect)
+                    self.apply_battlezone_effect(enemy, effect, scene)
         elif abi.target == TargetingType.SELF_BATTLEZONE:
             if AbilityType.SELF_BATTLEZONE in abi.atype:
                 for effect in abi.atype[AbilityType.SELF_BATTLEZONE]:
-                    self.apply_battlezone_effect(enemy, effect)
+                    self.apply_battlezone_effect(enemy, effect, scene)
         abi.expend_pp()
         if enemy.passive == Passive.PRESSURE:
             abi.expend_pp()
 
-    def apply_healing(self, target: "Pokemon", abi_details: list):
+    def apply_healing(self, target: "Pokemon", abi_details: list, scene: "BattleScene"):
         heal_mag = abi_details[0] / 100
 
         heal_amount = int(target.get_stat(Stat.HP) * heal_mag)
@@ -315,25 +327,24 @@ class Pokemon:
         if target.current_hp > target.get_stat(Stat.HP):
             target.current_hp = target.get_stat(Stat.HP)
         
-        print(f"{target.name} had its HP restored!")
-        print(f"{target.name} has {target.current_hp}/{target.get_stat(Stat.HP)} HP!")
+        scene.message_queue.append(f"{target.name} had its HP restored!")
 
     def set_battleslot(self, battle_slot: "BattleSlot"):
         self.battle_slot = battle_slot
 
-    def apply_battlezone_effect(self, target: "Pokemon", abi_details: list):
+    def apply_battlezone_effect(self, target: "Pokemon", abi_details: list, scene: "BattleScene"):
         effect = abi_details[0]
         activation_string = abi_details[1]
 
         for eff in target.battle_slot.effects:
             if eff.effect_type == effect.effect_type:
-                print("It failed!")
+                scene.message_queue.append("It failed!")
                 return
 
         target.battle_slot.add_effect(effect)
-        print(activation_string)
+        scene.message_queue.append(activation_string)
 
-    def apply_boost(self, target: "Pokemon", abi_details: list):
+    def apply_boost(self, target: "Pokemon", abi_details: list, scene: "BattleScene"):
         chance = abi_details[0]
         boost_type = abi_details[1]
         boost_mag = abi_details[2]
@@ -343,38 +354,34 @@ class Pokemon:
         if roll <= chance:
             for boost in boost_type:
                 if boost_mag < 0:
-                    print(f"{target.name}'s {boost.name} has been lowered by {boost_mag * -1}!")
+                    scene.message_queue.append(f"{target.name}'s {boost.name} {boost_mag * -1}!")
                 else:
-                    print(f"{target.name}'s {boost.name} has been raised by {boost_mag}!")
+                    scene.message_queue.append(f"{target.name}'s {boost.name} {boost_mag}!")
                 target.receive_boost(boost, boost_mag)
 
-    def pre_check_for_status_failure(self, scene) -> bool:
+    def pre_check_for_status_failure(self, scene: "BattleScene") -> bool:
         for status in self.status_effects:
             if status == StatusEffect.PARALYZE:
                 roll = random.randint(1,100)
                 if roll <= 25:
                     self.failed_paralyze = True
-                    scene.pre_message_queue.append(f"{self.name} is paralyzed! It can't move!")
+                    scene.message_queue.append(f"{self.name} is paralyzed! It can't move!")
                     return True
             if status == StatusEffect.CONFUSE:
                 roll = random.randint(1, 100)
-                print(f"{self.name} is confused!")
+                scene.message_queue.append(f"{self.name} is confused!")
                 if roll <= 33:
                     self.failed_confusion = True
-                    scene.pre_message_queue.append(f"{self.name} hurt itself in its confusion!")
-                    self.confusion_self_damage()
                     return True
             if status == StatusEffect.FREEZE:
                 if roll <= 20:
                     self.failed_frozen = True
-                    scene.pre_message_queue.append(f"{self.name} is frozen solid!")
                     return True
             if status == StatusEffect.ATTRACT:
-                scene.pre_message_queue.append(f"{self.name} is in love!")
+                scene.message_queue.append(f"{self.name} is in love!")
                 roll = random.randint(1, 100)
                 if roll <= 50:
                     self.failed_attract = True
-                    scene.pre_message_queue.append(f"{self.name} is immobilized by love!")
                     return True
             if status == StatusEffect.SLEEP:
                 if self.sleep_duration > 0:
@@ -385,30 +392,19 @@ class Pokemon:
                 
         return False
 
-    def execute_status_failure(self, scene) -> str:
-        for status in self.status_effects:
-            if status == StatusEffect.PARALYZE:
-                roll = random.randint(1,100)
-                if roll <= 25:
-                    scene.pre_message_queue.append(f"{self.name} is paralyzed! It can't move!")
-                    return True
-            if status == StatusEffect.CONFUSE:
-                roll = random.randint(1, 100)
-                print(f"{self.name} is confused!")
-                if roll <= 33:
-                    scene.pre_message_queue.append(f"{self.name} hurt itself in its confusion!")
-                    self.confusion_self_damage()
-                    return True
-            if status == StatusEffect.FREEZE:
-                scene.pre_message_queue.append(f"{self.name} is frozen solid!")
-                return True
-            if status == StatusEffect.ATTRACT:
-                scene.pre_message_queue.append(f"{self.name} is in love!")
-                roll = random.randint(1, 100)
-                if roll <= 50:
-                    scene.pre_message_queue.append(f"{self.name} is immobilized by love!")
-                    return True
-        return False
+    def execute_status_failure(self, scene: "BattleScene"):
+        if self.failed_paralyze:
+            scene.message_queue.append(f"{self.name} is paralyzed! It can't move!")
+        elif self.failed_frozen:
+            scene.message_queue.append(f"{self.name} is frozen solid!")
+        elif self.failed_sleep:
+            scene.message_queue.append(f"{self.name} is fast asleep!")
+        elif self.failed_confusion:
+            scene.message_queue.append(f"{self.name} hurt itself in its confusion!")
+            self.confusion_self_damage()
+        elif self.failed_attract:
+            scene.message_queue.append(f"{self.name} is immobilized by love!")
+      
 
     def status_failed(self) -> bool:
         return self.failed_attract or self.failed_confusion or self.failed_frozen or self.failed_paralyze or self.failed_sleep
@@ -433,16 +429,24 @@ class Pokemon:
         if status == StatusEffect.BURN and (ptypes.PokemonType.FIRE in self.types): 
             return True
 
-    def burn_tick(self):
-        print(f"{self.name} was hurt by its burn!")
+    def burn_tick(self, scene: "BattleScene"):
+        scene.message_queue.append(f"{self.name} was hurt by its burn!")
         burn_damage = self.get_stat(Stat.HP) // 16
         self.current_hp -= burn_damage
         if self.current_hp < 0:
             self.current_hp = 0
             self.fainted = True
-        print(f"{self.name} has {self.current_hp}/{self.get_stat(Stat.HP)}!")
 
-    def apply_status(self, target: "Pokemon", abi_details: list):
+    def poison_tick(self, scene: "BattleScene"):
+        scene.message_queue.append(f"{self.name} was hurt by poison!")
+        poison_damage = self.get_stat(Stat.HP) // 16
+        self.current_hp -= poison_damage
+        if self.current_hp < 0:
+            self.current_hp = 0
+            self.fainted = True
+        
+
+    def apply_status(self, target: "Pokemon", abi_details: list, scene: "BattleScene"):
         chance = abi_details[0]
         status_list = abi_details[1]
 
@@ -451,10 +455,10 @@ class Pokemon:
                 roll = random.randint(1,100)
                 if roll <= chance:
                     if is_greater_status(status) and target.contains_greater_status():
-                        print(f"{target.name} is already afflicted!")
+                        scene.message_queue.append(f"{target.name} is already afflicted!")
                     else:
                         target.receive_status(status)
-                        print(status_applied(target,status))
+                        scene.message_queue.append(status_applied(target,status))
                         return
 
     def contains_greater_status(self) -> bool:
@@ -479,10 +483,7 @@ class Pokemon:
         self.current_hp -= damage
         if self.current_hp < 0:
             self.current_hp = 0
-        print(f"{self.name} has {self.current_hp}/{self.get_stat(Stat.HP)} HP!")
-        if self.current_hp == 0:
-            print(f"{self.name} fainted!")
-            self.fainted = True
+        
 
     def receive_status(self, status: StatusEffect):
         if status == StatusEffect.CONFUSE:
@@ -495,7 +496,7 @@ class Pokemon:
             dur = None
         self.status_effects[status] = dur
 
-    def miss_check(self, target:"Pokemon", used_ability: Ability) -> bool:
+    def miss_check(self, target:"Pokemon", used_ability: Ability, scene: "BattleScene") -> bool:
         
         if used_ability.accuracy is not None:
             lower_acc = 3
@@ -519,13 +520,13 @@ class Pokemon:
             if hit_roll <= accuracy_range:
                 return True
             else:
-                print(f"{self.name}'s attack missed!")
+                scene.message_queue.append(f"{self.name}'s attack missed!")
                 return False
         return True
 
 
 
-    def recoil_damage(self, target: "Pokemon", used_ability: Ability, abi_details: list):
+    def recoil_damage(self, target: "Pokemon", used_ability: Ability, abi_details: list, scene: "BattleScene"):
         
         #Unpack effect details from argument
         power = abi_details[0]
@@ -582,14 +583,13 @@ class Pokemon:
         if off_stat == Stat.ATK and self.has_status(StatusEffect.BURN):
             damage_base = damage_base // 2
         
-        print(f"Against {target.name}, {self.name}'s {used_ability.name} deals {damage_base} damage!")
         if crit:
-            print("A critical hit!")
+            scene.message_queue.append("A critical hit!")
         target.receive_damage(damage_base)
-        print(f"{self.name} was damaged by recoil!")
+        scene.message_queue.append(f"{self.name} was damaged by recoil!")
         self.receive_damage(int(damage_base * (recoil / 100)))
 
-    def damage(self, target: "Pokemon", used_ability: Ability, abi_details: list):
+    def damage(self, target: "Pokemon", used_ability: Ability, abi_details: list, scene: "BattleScene"):
         
         power = abi_details[0]
         off_stat = abi_details[1]
@@ -623,7 +623,6 @@ class Pokemon:
         damage_base = int(damage_base * attack_defense)
         damage_base = damage_base // 50
         damage_base += 2
-
         if crit:
             damage_base = int(damage_base * 1.5)
     
@@ -642,9 +641,8 @@ class Pokemon:
         if off_stat == Stat.ATK and self.has_status(StatusEffect.BURN):
             damage_base = damage_base // 2
 
-        print(f"Against {target.name}, {self.name}'s {used_ability.name} deals {damage_base} damage!")
         if crit:
-            print("A critical hit!")
+            scene.message_queue.append("A critical hit!")
         target.receive_damage(damage_base)
 
         

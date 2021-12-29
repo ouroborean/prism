@@ -11,7 +11,7 @@ from prism import engine, text_formatter
 from prism.poke_db import initialize_pokemon
 from prism.abi_db import initialize_abilities
 from prism.stat import Stat
-from prism.status import BattleEffect
+from prism.status import BattleEffect, StatusEffect
 from prism.pokemon import pokespawn, Pokemon
 import enum
 import random
@@ -177,7 +177,7 @@ class BattleScene(engine.Scene):
         self.menu_font = init_font(MENU_FONT_SIZE)
         self.ability_font = init_font(ABILITY_FONT_SIZE)
         self.player_pokemon = Pokemon(*poke_db["hitmontop"])
-        self.player_pokemon.set_level(30)
+        self.player_pokemon.set_level(10)
         self.player_pokemon.learn_ability(abi_db["fire_punch"])
         self.player_pokemon.learn_ability(abi_db["ice_punch"])
         self.player_pokemon.learn_ability(abi_db["thunder_punch"])
@@ -211,20 +211,17 @@ class BattleScene(engine.Scene):
 
     def toggle_state(self, action: Action = None):
         if action == Action.FIGHT:
-            print("SELECTED FIGHT")
             #TODO Catch Encore
             self.selecting_ability = True
             self.selecting_pokemon = False
             self.selecting_action = False
             self.checking_trainer = False
         elif action == Action.PKMN:
-            print("SELECTED POKEMON")
             self.selecting_pokemon = True
             self.selecting_ability = False
             self.selecting_action = False
             self.checking_trainer = False
         elif action == Action.TRNR:
-            print("SELECTED TRAINER")
             self.checking_trainer = True
             self.selecting_action = False
             self.selecting_ability = False
@@ -271,8 +268,9 @@ class BattleScene(engine.Scene):
 
         self.player_pokemon_info_region.add_sprite(nameplate, -30, -5)
 
-        health_bar = self.sprite_factory.from_surface(self.get_scaled_surface(get_image_from_path("player_health_bar.png"), width = health_bar_width, height = 14))
-        self.player_pokemon_info_region.add_sprite(health_bar, 155, 63)
+        if health_bar_width > 0:
+            health_bar = self.sprite_factory.from_surface(self.get_scaled_surface(get_image_from_path("player_health_bar.png"), width = health_bar_width, height = 14))
+            self.player_pokemon_info_region.add_sprite(health_bar, 155, 63)
 
     def render_enemy_regions(self):
         self.render_enemy_pokemon_region()
@@ -307,8 +305,9 @@ class BattleScene(engine.Scene):
         
         health_bar_width = int(health_percent * 200)
 
-        health_bar = self.sprite_factory.from_surface(self.get_scaled_surface(get_image_from_path("enemy_health_bar.png"), width = health_bar_width, height = 9))
-        self.enemy_pokemon_info_region.add_sprite(health_bar, 155, 101)
+        if health_bar_width > 0:
+            health_bar = self.sprite_factory.from_surface(self.get_scaled_surface(get_image_from_path("enemy_health_bar.png"), width = health_bar_width, height = 9))
+            self.enemy_pokemon_info_region.add_sprite(health_bar, 155, 101)
 
     def render_battle_regions(self):
 
@@ -327,7 +326,7 @@ class BattleScene(engine.Scene):
                 lines = ["What will", f"{self.player_pokemon.name} do?"]
                 max_width = 460
             else:
-                max_width = 750
+                max_width = 730
                 if self.message_queue:
                     self.battle_info_string = self.message_queue[0]
                 lines = text_formatter.get_lines(self.battle_info_string, max_width, MENU_FONT_SIZE)
@@ -450,6 +449,9 @@ class BattleScene(engine.Scene):
     def pressed_confirm(self):
         if self.selecting_action:
             self.toggle_state(Action(self.selected_action))
+        elif self.selecting_pokemon:
+            self.enemy_pokemon.current_hp = self.enemy_pokemon.get_stat(Stat.HP)
+            self.toggle_state()
         elif self.selecting_ability:
             #TODO catch ability failstates (Disable, Torment, Taunt, No PP)
             if True:
@@ -536,6 +538,7 @@ class BattleScene(engine.Scene):
                         self.current_phase = BattlePhase.TURN_END_CHECK
                     else:
                         self.current_phase = BattlePhase.ACTION_SELECTION
+                        self.toggle_state()
         elif self.current_phase == BattlePhase.SECOND_ACTION_EXECUTION:
             if self.message_queue:
                 self.message_queue = self.message_queue[1:]
@@ -545,12 +548,14 @@ class BattleScene(engine.Scene):
                     self.current_phase = BattlePhase.TURN_END_CHECK
                 else:
                     self.current_phase = BattlePhase.ACTION_SELECTION
+                    self.toggle_state()
                 #TODO Turn End Check
         elif self.current_phase == BattlePhase.TURN_END_CHECK:
             if self.message_queue:
                 self.message_queue = self.message_queue[1:]
             if len(self.message_queue) == 0:
                 self.current_phase = BattlePhase.ACTION_SELECTION
+                self.toggle_state()
 
 
         
@@ -572,8 +577,6 @@ class BattleScene(engine.Scene):
     def start_turn(self):
         #TODO generate opponent decision
         self.acting_list = self.speed_order(self.player_pokemon, self.enemy_pokemon)
-        print(f"{self.acting_list[0].name}: {self.acting_list[0].get_stat(Stat.SPD)} - Moving First!")
-        print(f"{self.acting_list[1].name}: {self.acting_list[1].get_stat(Stat.SPD)} - Moving Second!")
         pokemon = self.acting_list[0]
         if pokemon.decision < 4:
             self.pre_ability_execution(pokemon)
@@ -587,9 +590,17 @@ class BattleScene(engine.Scene):
 
     def turn_end_check(self):
         
+        if StatusEffect.BURN in self.player_pokemon.status_effects:
+            self.player_pokemon.burn_tick(self)
+        if StatusEffect.POISON in self.player_pokemon.status_effects:
+            self.player_pokemon.poison_tick(self)
+        
 
+        if StatusEffect.BURN in self.enemy_pokemon.status_effects:
+            self.enemy_pokemon.burn_tick(self)
+        if StatusEffect.POISON in self.enemy_pokemon.status_effects:
+            self.enemy_pokemon.poison_tick(self)
 
-        self.toggle_state()
 
     def pre_pokemon_change(self, pokemon: "Pokemon"):
 
@@ -606,7 +617,7 @@ class BattleScene(engine.Scene):
         if pokemon == self.player_pokemon:
             if pokemon.decision < 4:
                 if not pokemon.status_failed():
-                    pokemon.execute_ability(self.enemy_pokemon, pokemon.abilities[pokemon.decision])
+                    pokemon.execute_ability(self.enemy_pokemon, pokemon.abilities[pokemon.decision], self)
             elif pokemon.decision == 10:
                 pass
             else:
@@ -615,7 +626,7 @@ class BattleScene(engine.Scene):
         else:
             if pokemon.decision < 4:
                 if not pokemon.status_failed():
-                    pokemon.execute_ability(self.player_pokemon, pokemon.abilities[pokemon.decision])
+                    pokemon.execute_ability(self.player_pokemon, pokemon.abilities[pokemon.decision], self)
             elif pokemon.decision == 10:
                 pass
             else:
