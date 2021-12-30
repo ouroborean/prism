@@ -169,7 +169,7 @@ class DialogueScene(engine.Scene):
             self.scene_manager.close_scene(self)
 
     def pressed_cancel(self):
-        self.scene_manager.close_scene(self)
+        pass
     
     def pressed_down(self):
         self.selected_prompt += 1

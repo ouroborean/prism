@@ -37,7 +37,7 @@ def main():
     scene_manager.battle = battle_scene.make_battle_scene(scene_manager)
     scene_manager.belt = pokebelt_scene.make_pokebelt_scene(scene_manager)
     
-    scene_manager.set_scene_to_active(scene_manager.battle)
+    scene_manager.set_scene_to_active(scene_manager.overworld)
     scene_manager.spriterenderer.render(
         scene_manager.current_scene.renderables())
 
@@ -65,6 +65,8 @@ async def game_loop(scene_manager: SceneManager,
                 if event.type == sdl2.SDL_KEYUP:
                     scene_manager.dispatch_key_release_event(
                         event.key.keysym.sym)
+        if scene_manager.active_event:
+            scene_manager.run_event()
         if scene_manager.current_scene == scene_manager.dialogue:
             if scene_manager.current_scene.printing_dialogue and scene_manager.frame_count % scene_manager.current_scene.dialogue_speed == 0 and scene_manager.current_scene.not_waiting():
                 scene_manager.current_scene.full_render()                        

@@ -39,7 +39,7 @@ def init_font(size: int):
                                   FONT_FILENAME) as path:
         return sdl2.sdlttf.TTF_OpenFont(str.encode(os.fspath(path)), size)
 
-test_trainer = Trainer("Test Trainer", [pokespawn("mismagius", 15, ["shadow_ball", "flamethrower"]),])
+
 
 
 @enum.unique
@@ -126,8 +126,6 @@ class BattleScene(engine.Scene):
         self.characters_printed = 0
         self.lines_printed = 0
         self.lines_to_print = 0
-        self.trainer = test_trainer
-        self.enemy_pokemon = self.trainer.team[0]
         self.enemy_pokemon_region = self.region.subregion(400, 0, 400, 350)
         self.enemy_pokemon_info_region = self.region.subregion(0, 0, 400, 200)
         self.player_pokemon_region = self.region.subregion(0, 200, 400, 300)
@@ -141,8 +139,6 @@ class BattleScene(engine.Scene):
         self.menu_font = init_font(MENU_FONT_SIZE)
         self.ability_font = init_font(ABILITY_FONT_SIZE)
         
-        self.player = Player(self.sprite_factory.from_surface(self.get_scaled_surface(get_image_from_path("player.png")), free=True))
-        self.player_pokemon = self.player.team[0]
         self.acting_list = []
     
     def begin_battle(self, player: Player, trainer: "Trainer"):
@@ -150,12 +146,12 @@ class BattleScene(engine.Scene):
         self.trainer = trainer
 
         for pokemon in self.player.team:
-            if pokemon.hp > 0 and not pokemon.is_egg:
+            if pokemon.current_hp > 0 and not pokemon.is_egg:
                 self.player_pokemon = pokemon
                 break
         
         for pokemon in self.trainer.team:
-            if pokemon.hp > 0 and not pokemon.is_egg:
+            if pokemon.current_hp > 0 and not pokemon.is_egg:
                 self.enemy_pokemon = pokemon
                 break
         
@@ -165,6 +161,7 @@ class BattleScene(engine.Scene):
         self.selecting_ability = False
         self.selecting_pokemon = False
         self.checking_trainer = False
+        self.full_render()
 
     def render_player_regions(self):
         self.render_player_pokemon_region()
@@ -435,7 +432,7 @@ class BattleScene(engine.Scene):
         self.full_render()
 
     def pressed_confirm(self):
-        if not self.player_ticking_health and not self.enemy_ticking_health:
+        if not self.player_ticking_health and not self.enemy_ticking_health and not self.executing_turn:
             if self.selecting_action:
                 self.toggle_state(Action(self.selected_action))
             elif self.selecting_ability:
@@ -656,5 +653,4 @@ def make_battle_scene(scene_manager) -> BattleScene:
     scene.key_press_events[sdl2.SDLK_RIGHT] = scene.pressed_right
     scene.key_press_events[sdl2.SDLK_e] = scene.pressed_confirm
     scene.key_press_events[sdl2.SDLK_q] = scene.pressed_cancel
-    scene.full_render()
     return scene

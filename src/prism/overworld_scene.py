@@ -412,7 +412,10 @@ class OverworldScene(engine.Scene):
             self.current_map[target_square].item = None
             self.full_render()
         elif self.current_map[target_square].occupied and self.current_map[target_square].actor.interactable:
-            self.current_map[target_square].actor.dialogue_script(self)
+            if self.current_map[target_square].actor.battle_ready:
+                self.scene_manager.start_event(self.current_map[target_square].actor.battle_script, (self.current_map[target_square].actor, self))
+            else:
+                self.current_map[target_square].actor.dialogue_script(self)
 
     def released_down(self):
         self.down_held = False

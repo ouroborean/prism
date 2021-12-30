@@ -512,7 +512,7 @@ def initialize_abilities() -> dict[str, Ability]:
     # ability_db["stored_power"] = Ability("Stored Power", PokemonType.PSYCHIC, 100, 10, 0, TargetingType.TARGETINGTYPE, (AbilityType.DAMAGE,), ((20, Stat.SPATK, Stat.SPDEF),), TAGS) 
     # ability_db["quick_guard"] = Ability("Quick Guard", PokemonType.FIGHTING, None, 15, 0, TargetingType.TARGETINGTYPE, (AbilityType.ABILITYTYPE,), ((EFFECTCLUSTER),), TAGS)
     # ability_db["ally_switch"] = Ability("Ally Switch", PokemonType.PSYCHIC, None, 15, 0, TargetingType.TARGETINGTYPE, (AbilityType.ABILITYTYPE,), ((EFFECTCLUSTER),), TAGS)
-    # ability_db["scald"] = Ability("Scald", PokemonType.WATER, 100, 15, 0, TargetingType.TARGETINGTYPE, (AbilityType.DAMAGE,), ((80, Stat.SPATK, Stat.SPDEF),), TAGS)
+    ability_db["scald"] = Ability("Scald", PokemonType.WATER, 100, 15, 0, TargetingType.ENEMY, (AbilityType.DAMAGE,AbilityType.TARGET_STATUS), ((80, Stat.SPATK, Stat.SPDEF),(10, (StatusEffect.BURN,),)))
     # ability_db["shell_smash"] = Ability("Shell Smash", PokemonType.NORMAL, None, 15, 0, TargetingType.TARGETINGTYPE, (AbilityType.ABILITYTYPE,), ((EFFECTCLUSTER),), TAGS)
     # ability_db["heal_pulse"] = Ability("Heal Pulse", PokemonType.PSYCHIC, None, 10, 0, TargetingType.TARGETINGTYPE, (AbilityType.ABILITYTYPE,), ((EFFECTCLUSTER),), TAGS)
     # ability_db["hex"] = Ability("Hex", PokemonType.GHOST, 100, 10, 0, TargetingType.TARGETINGTYPE, (AbilityType.DAMAGE,), ((65, Stat.SPATK, Stat.SPDEF),), TAGS)
