@@ -7,7 +7,7 @@ import sdl2.ext
 import sdl2.sdlttf
 from prism.menu_scene import MenuScene
 from prism.scene_manager import SceneManager
-from prism import dialogue_scene, overworld_scene, menu_scene, battle_scene
+from prism import dialogue_scene, overworld_scene, menu_scene, battle_scene, pokebelt_scene
 
 
 def main():
@@ -35,6 +35,7 @@ def main():
     scene_manager.dialogue = dialogue_scene.make_dialogue_scene(scene_manager)
     scene_manager.menu = menu_scene.make_menu_scene(scene_manager)
     scene_manager.battle = battle_scene.make_battle_scene(scene_manager)
+    scene_manager.belt = pokebelt_scene.make_pokebelt_scene(scene_manager)
     
     scene_manager.set_scene_to_active(scene_manager.battle)
     scene_manager.spriterenderer.render(

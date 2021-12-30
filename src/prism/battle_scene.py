@@ -16,10 +16,9 @@ from prism.pokemon import pokespawn, Pokemon
 import enum
 import random
 from prism.trainer import Trainer
-
+from prism.player import Player
 if typing.TYPE_CHECKING:
     from prism.scene_manager import SceneManager
-    from prism.player import Player
 
 
 abi_db = initialize_abilities()
@@ -42,55 +41,6 @@ def init_font(size: int):
 
 test_trainer = Trainer("Test Trainer", [pokespawn("mismagius", 15, ["shadow_ball", "flamethrower"]),])
 
-class BattleSlot:
-    active_pokemon: "Pokemon"
-    effects: list[BattleEffect]
-    battle: "Battle"
-    team: list["Pokemon"]
-
-    def __init__(self):
-        self.effects = []
-
-    def assign_initial_pokemon(self, pokemon: "Pokemon"):
-        self.active_pokemon = pokemon
-        pokemon.set_battleslot(self)
-        self.team.remove(pokemon)
-        self.team.append(pokemon)
-
-    def assign_team(self, team: list["Pokemon"]):
-        self.team = team
-
-    def add_effect(self, effect: BattleEffect):
-        self.effects.append(effect)
-
-    def change_active(self, slot):
-        pokeswap = self.team[slot]
-        del self.team[slot]
-        self.team.append(pokeswap)
-        self.active_pokemon = pokeswap
-        self.active_pokemon.set_battleslot(self)
-        
-
-
-
-class Battle:
-    battle_slots: Tuple[BattleSlot]
-    teams: Tuple[list["Pokemon"]]
-    effects: list[BattleEffect]
-
-    def __init__(self):
-        self.effects = []
-        
-    def assign_battle_slots(self, slots: Tuple[BattleSlot]):
-        for battle_slot in slots:
-            battle_slot.battle = self
-        self.battle_slots = slots
-    
-    def assign_teams(self, teams: Tuple[list["Pokemon"]]):
-        self.teams = teams
-        for team in teams:
-            for pokemon in team:
-                pokemon.assign_team(team)
 
 @enum.unique
 class BattlePhase(enum.IntEnum):
@@ -122,7 +72,7 @@ WHITE = sdl2.SDL_Color(255, 255, 255)
 
 class BattleScene(engine.Scene):
 
-    player: "Player"
+    player: Player
     trainer: "Trainer"
     scene_manager: "SceneManager"
     enemy_pokemon_region: engine.Region
@@ -190,15 +140,12 @@ class BattleScene(engine.Scene):
         self.hp_font = init_font(HEALTH_FONT_SIZE)
         self.menu_font = init_font(MENU_FONT_SIZE)
         self.ability_font = init_font(ABILITY_FONT_SIZE)
-        self.player_pokemon = Pokemon(*poke_db["mudkip"])
-        self.player_pokemon.set_level(5)
-        self.player_pokemon.learn_ability(abi_db["fire_punch"])
-        self.player_pokemon.learn_ability(abi_db["ice_punch"])
-        self.player_pokemon.learn_ability(abi_db["thunder_punch"])
-        self.player_pokemon.learn_ability(abi_db["mega_punch"])
+        
+        self.player = Player(self.sprite_factory.from_surface(self.get_scaled_surface(get_image_from_path("player.png")), free=True))
+        self.player_pokemon = self.player.team[0]
         self.acting_list = []
     
-    def begin_battle(self, player: "Player", trainer: "Trainer"):
+    def begin_battle(self, player: Player, trainer: "Trainer"):
         self.player = player
         self.trainer = trainer
 
@@ -235,10 +182,8 @@ class BattleScene(engine.Scene):
             self.selecting_action = False
             self.checking_trainer = False
         elif action == Action.PKMN:
-            self.selecting_pokemon = True
-            self.selecting_ability = False
-            self.selecting_action = False
-            self.checking_trainer = False
+            self.scene_manager.open_belt(self.player, True)
+            self.toggle_state()
         elif action == Action.TRNR:
             self.checking_trainer = True
             self.selecting_action = False
@@ -253,9 +198,10 @@ class BattleScene(engine.Scene):
 
     def render_player_pokemon_region(self):
         self.player_pokemon_region.clear()
-        pokemon_sprite = self.sprite_factory.from_surface(self.get_scaled_surface(self.player_pokemon.back_image, width=300, height=300))
-        height_adjust = self.player_pokemon_region.size()[1] - pokemon_sprite.size[1]
-        self.player_pokemon_region.add_sprite(pokemon_sprite, 50, height_adjust)
+        if not self.player_pokemon.fainted:
+            pokemon_sprite = self.sprite_factory.from_surface(self.get_scaled_surface(self.player_pokemon.back_image, width=300, height=300))
+            height_adjust = self.player_pokemon_region.size()[1] - pokemon_sprite.size[1]
+            self.player_pokemon_region.add_sprite(pokemon_sprite, 50, height_adjust)
 
 
     def render_player_pokemon_info_region(self):
@@ -296,8 +242,9 @@ class BattleScene(engine.Scene):
 
     def render_enemy_pokemon_region(self):
         self.enemy_pokemon_region.clear()
-        pokemon_sprite = self.sprite_factory.from_surface(self.get_scaled_surface(self.enemy_pokemon.front_image, width = 300, height = 300))
-        self.enemy_pokemon_region.add_sprite(pokemon_sprite, 15, 0)
+        if not self.enemy_pokemon.fainted:
+            pokemon_sprite = self.sprite_factory.from_surface(self.get_scaled_surface(self.enemy_pokemon.front_image, width = 300, height = 300))
+            self.enemy_pokemon_region.add_sprite(pokemon_sprite, 15, 0)
 
     def render_enemy_pokemon_info_region(self):
         self.enemy_pokemon_info_region.clear()
@@ -330,7 +277,7 @@ class BattleScene(engine.Scene):
     def render_battle_regions(self):
 
         self.render_battle_info_region()
-        if self.selecting_action and not self.enemy_ticking_health and not self.player_ticking_health:
+        if self.current_phase == BattlePhase.ACTION_SELECTION and not self.selecting_ability and not self.enemy_ticking_health and not self.player_ticking_health:
             self.render_battle_options_region()
 
     def render_battle_info_region(self):
@@ -491,9 +438,6 @@ class BattleScene(engine.Scene):
         if not self.player_ticking_health and not self.enemy_ticking_health:
             if self.selecting_action:
                 self.toggle_state(Action(self.selected_action))
-            elif self.selecting_pokemon:
-                self.enemy_pokemon.current_hp = self.enemy_pokemon.get_stat(Stat.HP)
-                self.toggle_state()
             elif self.selecting_ability:
                 #TODO catch ability failstates (Disable, Torment, Taunt, No PP)
                 if True:
@@ -517,6 +461,20 @@ class BattleScene(engine.Scene):
         else:
             return self.player_pokemon
 
+    def get_decision(self, decision_slot: int):
+        self.player_pokemon.decision = decision_slot
+        self.current_phase = BattlePhase.FIRST_ACTION_DESCRIPTION
+        self.start_turn()
+        self.full_render()
+
+    def change_pokemon(self, slot: int, player: bool):
+        if player:
+            self.player_pokemon = self.player.team[slot - 4]
+        else:
+            self.enemy_pokemon = self.trainer.team[slot - 4]
+        self.full_render()
+
+
     def start_turn(self):
         self.get_enemy_decision()
         self.acting_list = self.speed_order(self.player_pokemon, self.enemy_pokemon)
@@ -532,8 +490,8 @@ class BattleScene(engine.Scene):
                 self.current_phase = BattlePhase.FIRST_ACTION_EXECUTION
         elif self.current_phase == BattlePhase.FIRST_ACTION_EXECUTION:
             if not self.message_queue:
-                self.interim_check()
                 self.current_phase = BattlePhase.INTERIM_CHECK
+                self.interim_check()
         elif self.current_phase == BattlePhase.INTERIM_CHECK:
             if not self.message_queue:
                 self.pre_check(self.acting_list[1])
@@ -551,6 +509,7 @@ class BattleScene(engine.Scene):
                 self.toggle_state()
                 self.executing_turn = False
                 self.current_phase = BattlePhase.ACTION_SELECTION
+                self.full_render()
 
     
     def pre_check(self, pokemon: "Pokemon"):
@@ -562,7 +521,24 @@ class BattleScene(engine.Scene):
             self.pre_pokemon_change(pokemon)
 
     def interim_check(self):
-        pass
+        if self.acting_list[0].current_hp == 0:
+            if self.acting_list[0] == self.player_pokemon:
+                owner_msg = ""
+                self.player_pokemon.fainted = True
+            else:
+                owner_msg = "The enemy "
+                self.enemy_pokemon.fainted = True
+            self.message(f"{owner_msg}{self.player_pokemon.name} fainted!")
+            self.current_phase = BattlePhase.SECOND_ACTION_EXECUTION
+        if self.acting_list[1].current_hp == 0:
+            if self.acting_list[1] == self.player_pokemon:
+                owner_msg = ""
+                self.player_pokemon.fainted = True
+            else:
+                owner_msg = "The enemy "
+                self.enemy_pokemon.fainted = True
+            self.message(f"{owner_msg}{self.player_pokemon.name} fainted!")
+            self.current_phase = BattlePhase.SECOND_ACTION_EXECUTION
 
     def turn_end_check(self):
         
@@ -581,17 +557,41 @@ class BattleScene(engine.Scene):
             self.enemy_pokemon.poison_tick(self)
             self.enemy_ticking_health = True
 
+        if self.acting_list[0].current_hp == 0 and not self.acting_list[0].fainted:
+            if self.acting_list[0] == self.player_pokemon:
+                owner_msg = ""
+                self.player_pokemon.fainted = True
+            else:
+                owner_msg = "The enemy "
+                self.enemy_pokemon.fainted = True
+            self.message(f"{owner_msg}{self.acting_list[0].name} fainted!")
+        if self.acting_list[1].current_hp == 0 and not self.acting_list[1].fainted:
+            if self.acting_list[1] == self.player_pokemon:
+                owner_msg = ""
+                self.player_pokemon.fainted = True
+            else:
+                owner_msg = "The enemy "
+                self.enemy_pokemon.fainted = True
+            
+            self.message(f"{owner_msg}{self.acting_list[1].name} fainted!")
+
 
     def pre_pokemon_change(self, pokemon: "Pokemon"):
 
         if pokemon == self.player_pokemon:
-            self.message(f"{pokemon.name} switched out to {self.player.team[pokemon.decision - 4]}!")
+            self.message(f"{pokemon.name} switched out to {self.player.team[pokemon.decision - 4].name}!")
         else:
-            self.message(f"{pokemon.name} switched out to {self.trainer.team[pokemon.decision - 4]}!")
+            self.message(f"The enemy {pokemon.name} switched out to {self.trainer.team[pokemon.decision - 4].name}!")
         
     def pre_ability_execution(self, pokemon: "Pokemon"):
+        if self.player_pokemon == pokemon:
+            player = True
+            owner_msg = ""
+        else:
+            player = False
+            owner_msg = "The enemy "
         if not pokemon.pre_check_for_status_failure(self):
-            self.message(f"{pokemon.name} used {pokemon.abilities[pokemon.decision].name}!")
+            self.message(f"{owner_msg}{pokemon.name} used {pokemon.abilities[pokemon.decision].name}!")
 
     def get_enemy_decision(self):
 
@@ -608,8 +608,7 @@ class BattleScene(engine.Scene):
             elif pokemon.decision == 10:
                 pass
             else:
-                #TODO Pokemon switching
-                pass
+                self.change_pokemon(pokemon.decision, True)
         else:
             if pokemon.decision < 4:
                 if not pokemon.status_failed():
@@ -617,8 +616,7 @@ class BattleScene(engine.Scene):
             elif pokemon.decision == 10:
                 pass
             else:
-                #TODO Pokemon switching
-                pass
+                self.change_pokemon(pokemon.decision, True)
 
     def speed_order(self, pokemon1: "Pokemon", pokemon2: "Pokemon") -> Tuple["Pokemon", "Pokemon"]:
         if pokemon1.using_ability() and pokemon2.using_ability():

@@ -5,12 +5,12 @@ from typing import Tuple
 import typing
 from prism.poke_db import initialize_pokemon
 from prism.abi_db import initialize_abilities
+from prism.pokemon import pokespawn
 
 if typing.TYPE_CHECKING:
     from prism.areamap import Item
     from prism.pokemon import Pokemon
 
-poke_db = initialize_pokemon()
 abi_db = initialize_abilities()
 
 class Player:
@@ -33,6 +33,7 @@ class Player:
         self.direction = (0,0)
         self.sprite = sprite
         self.bag = []
+        self.team = [pokespawn("mudkip", 5, ["fire_punch", "thunder_punch"]), pokespawn("mismagius", 40, ["shadow_ball", "aurora_beam", "energy_ball", "flamethrower"])]
 
     def pick_up_item(self, item: "Item"):
         self.bag.append(item)

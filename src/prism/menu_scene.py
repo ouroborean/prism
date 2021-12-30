@@ -67,6 +67,7 @@ class MenuScene(engine.Scene):
 
     def full_render(self):
         self.menu_region.clear()
+        
         outer_box = self.sprite_factory.from_color(AQUA, self.menu_region.size())
         inner_box = self.sprite_factory.from_color(WHITE, (self.menu_region.size()[0] - 8, self.menu_region.size()[1] - 8))
 
@@ -100,10 +101,8 @@ class MenuScene(engine.Scene):
         self.full_render()
     
     def select_pokemon(self):
-        print("Player's team:")
-        for pokemon in self.player.team:
-            print(f"{pokemon.name}: Level: {pokemon.level} HP: {pokemon.get_stat(Stat.HP)} / {pokemon.get_stat(Stat.HP)}")
-    
+        self.scene_manager.open_belt(self.player, False)
+
     def select_map(self):
         pass
 

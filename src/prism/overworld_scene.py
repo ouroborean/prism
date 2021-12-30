@@ -143,6 +143,7 @@ class OverworldScene(engine.Scene):
         self.event_running = False
         self.tiles = []
         self.running_events = []
+        
 
     def change_map(self, new_map: "AreaMap"):
         self.current_map = new_map    

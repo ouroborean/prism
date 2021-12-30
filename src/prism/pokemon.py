@@ -133,6 +133,10 @@ class Pokemon:
         except:
             self.back_image = None
         
+        try:
+            self.belt_image = get_image_from_path(self.database_name + "_belt.png")
+        except:
+            self.belt_image = None
 
         self.level = 1
         self.nature = "Serious"
@@ -363,16 +367,22 @@ class Pokemon:
                 target.receive_boost(boost, boost_mag)
 
     def pre_check_for_status_failure(self, scene: "BattleScene") -> bool:
+        
+        if self == scene.player_pokemon:
+            owner_msg = ""
+        else:
+            owner_msg = "The enemy "
+
         for status in self.status_effects:
             if status == StatusEffect.PARALYZE:
                 roll = random.randint(1,100)
                 if roll <= 25:
                     self.failed_paralyze = True
-                    scene.message(f"{self.name} is paralyzed! It can't move!")
+                    scene.message(f"{owner_msg}{self.name} is paralyzed! It can't move!")
                     return True
             if status == StatusEffect.CONFUSE:
                 roll = random.randint(1, 100)
-                scene.message(f"{self.name} is confused!")
+                scene.message(f"{owner_msg}{self.name} is confused!")
                 if roll <= 33:
                     self.failed_confusion = True
                     return True
@@ -381,7 +391,7 @@ class Pokemon:
                     self.failed_frozen = True
                     return True
             if status == StatusEffect.ATTRACT:
-                scene.message(f"{self.name} is in love!")
+                scene.message(f"{owner_msg}{self.name} is in love!")
                 roll = random.randint(1, 100)
                 if roll <= 50:
                     self.failed_attract = True
@@ -396,19 +406,25 @@ class Pokemon:
         return False
 
     def execute_status_failure(self, scene: "BattleScene"):
+
+        if self == scene.player_pokemon:
+            owner_msg = ""
+        else:
+            owner_msg = "The enemy "
+
         if self.failed_paralyze:
-            scene.message(f"{self.name} is paralyzed! It can't move!")
+            scene.message(f"{owner_msg}{self.name} is paralyzed! It can't move!")
         elif self.failed_frozen:
-            scene.message(f"{self.name} is frozen solid!")
+            scene.message(f"{owner_msg}{self.name} is frozen solid!")
         elif self.failed_sleep:
-            scene.message(f"{self.name} is fast asleep!")
+            scene.message(f"{owner_msg}{self.name} is fast asleep!")
         elif self.failed_confusion:
-            scene.message(f"{self.name} hurt itself in its confusion!")
+            scene.message(f"{owner_msg}{self.name} hurt itself in its confusion!")
             scene.enemy_ticking_health = True
             scene.player_ticking_health = True
             self.confusion_self_damage()
         elif self.failed_attract:
-            scene.message(f"{self.name} is immobilized by love!")
+            scene.message(f"{owner_msg}{self.name} is immobilized by love!")
       
 
     def status_failed(self) -> bool:
@@ -428,42 +444,56 @@ class Pokemon:
         self.current_hp -= damage_base
         if self.current_hp < 0:
             self.current_hp = 0
-            self.fainted = True
 
     def is_status_immune(self, status: StatusEffect) -> bool:
         if status == StatusEffect.BURN and (ptypes.PokemonType.FIRE in self.types): 
             return True
 
     def burn_tick(self, scene: "BattleScene"):
-        scene.message(f"{self.name} was hurt by its burn!")
+
+        if self == scene.player_pokemon:
+            owner_msg = ""
+        else:
+            owner_msg = "The enemy "
+
+        scene.message(f"{owner_msg}{self.name} was hurt by its burn!")
         burn_damage = self.get_stat(Stat.HP) // 16
         self.current_hp -= burn_damage
         if self.current_hp < 0:
             self.current_hp = 0
-            self.fainted = True
 
     def poison_tick(self, scene: "BattleScene"):
-        scene.message(f"{self.name} was hurt by poison!")
+
+        if self == scene.player_pokemon:
+            owner_msg = ""
+        else:
+            owner_msg = "The enemy "
+
+        scene.message(f"{owner_msg}{self.name} was hurt by poison!")
         poison_damage = self.get_stat(Stat.HP) // 16
         self.current_hp -= poison_damage
         if self.current_hp < 0:
             self.current_hp = 0
-            self.fainted = True
         
 
     def apply_status(self, target: "Pokemon", abi_details: list, scene: "BattleScene"):
         chance = abi_details[0]
         status_list = abi_details[1]
 
+        if self == scene.player_pokemon:
+            owner_msg = ""
+        else:
+            owner_msg = "The enemy "
+
         for status in status_list:
             if not target.is_status_immune(status):
                 roll = random.randint(1,100)
                 if roll <= chance:
                     if is_greater_status(status) and target.contains_greater_status():
-                        scene.message(f"{target.name} is already afflicted!")
+                        scene.message(f"{owner_msg}{target.name} is already afflicted!")
                     else:
                         target.receive_status(status)
-                        scene.message(status_applied(target,status))
+                        scene.message(status_applied(f"{owner_msg}{target.name}",status))
                         return
 
     def contains_greater_status(self) -> bool:
@@ -503,6 +533,11 @@ class Pokemon:
 
     def miss_check(self, target:"Pokemon", used_ability: Ability, scene: "BattleScene") -> bool:
         
+        if self == scene.player_pokemon:
+            owner_msg = ""
+        else:
+            owner_msg = "The enemy "
+
         if used_ability.accuracy is not None:
             lower_acc = 3
             upper_acc = 3
@@ -525,7 +560,7 @@ class Pokemon:
             if hit_roll <= accuracy_range:
                 return True
             else:
-                scene.message(f"{self.name}'s attack missed!")
+                scene.message(f"{owner_msg}{self.name}'s attack missed!")
                 return False
         return True
 
@@ -538,6 +573,11 @@ class Pokemon:
         off_stat = abi_details[1]
         def_stat = abi_details[2]
         recoil = abi_details[3]
+
+        if self == scene.player_pokemon:
+            owner_msg = ""
+        else:
+            owner_msg = "The enemy "
 
         crit_stage = 0
         if "crit" in used_ability.tags:
@@ -603,7 +643,7 @@ class Pokemon:
             scene.message("It's not very effective. . .")
 
         target.receive_damage(damage_base)
-        scene.message(f"{self.name} was damaged by recoil!")
+        scene.message(f"{owner_msg}{self.name} was damaged by recoil!")
         self.receive_damage(int(damage_base * (recoil / 100)))
         scene.enemy_ticking_health = True
         scene.player_ticking_health = True
@@ -613,6 +653,11 @@ class Pokemon:
         power = abi_details[0]
         off_stat = abi_details[1]
         def_stat = abi_details[2]
+
+        if self == scene.player_pokemon:
+            owner_msg = ""
+        else:
+            owner_msg = "The enemy "
 
         crit_stage = 0
         if "crit" in used_ability.tags:
@@ -666,8 +711,6 @@ class Pokemon:
         #Burn modification
         if off_stat == Stat.ATK and self.has_status(StatusEffect.BURN):
             damage_base = damage_base // 2
-
-        print(damage_base)
 
         if effective > 0:
             scene.message("It's super effective!")

@@ -17,7 +17,9 @@ if typing.TYPE_CHECKING:
     from prism.dialogue_scene import DialogueScene
     from prism.menu_scene import MenuScene
     from prism.battle_scene import BattleScene
+    from prism.pokebelt_scene import PokeBeltScene
     from prism.player import Player
+    from prism.pokemon import Pokemon
 
 class SceneManager:
     """Manager for all game scenes"""
@@ -33,6 +35,7 @@ class SceneManager:
     overworld: "OverworldScene"
     menu: "MenuScene"
     battle: "BattleScene"
+    belt: "PokeBeltScene"
     stored_prompt: str
 
     @property
@@ -68,6 +71,10 @@ class SceneManager:
     def dispatch_key_release_event(self, key_event: int):
         self.current_scene.dispatch_key_release_event(key_event)
 
+    def open_belt(self, player: "Player", in_battle: bool, forced: bool = False):
+        self.set_scene_to_active(self.belt)
+        self.belt.check_belt(player, in_battle, forced)
+
     def play_sound(self, file_name: str):
         # with importlib.resources.path('animearena.resources', file_name) as path:
         #     playsound(str(path), False)
@@ -91,6 +98,10 @@ class SceneManager:
 
     def set_scene_to_active(self, scene):
         self.active_scenes.append(scene)
+
+    def swap_pokemon(self, decision_slot: int):
+        self.close_scene(self.belt)
+        self.battle.get_decision(decision_slot + 4)
 
     def change_window_size(self, new_width: int, new_height: int):
         sdl2.SDL_SetWindowSize(self.window.window, new_width, new_height)

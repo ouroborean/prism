@@ -41,35 +41,35 @@ class StatusEffect(enum.IntEnum):
     REST_SLEEP = 15
     FLINCH = 16
 
-def status_applied(target: "Pokemon", status_effect: StatusEffect) -> str:
+def status_applied(target_string: str, status_effect: StatusEffect) -> str:
     if status_effect == StatusEffect.FREEZE:
-        return f"{target.name} was frozen solid!"
+        return f"{target_string} was frozen solid!"
     elif status_effect == StatusEffect.BURN:
-        return f"{target.name} was burned!"
+        return f"{target_string} was burned!"
     elif status_effect == StatusEffect.PARALYZE:
-        return f"{target.name} was paralyzed!"
+        return f"{target_string} was paralyzed!"
     elif status_effect == StatusEffect.SLEEP:
-        return f"{target.name} fell asleep!"
+        return f"{target_string} fell asleep!"
     elif status_effect == StatusEffect.POISON:
-        return f"{target.name} was poisoned!"
+        return f"{target_string} was poisoned!"
     elif status_effect == StatusEffect.TOXIC:
-        return f"{target.name} was badly poisoned!"
+        return f"{target_string} was badly poisoned!"
     elif status_effect == StatusEffect.CURSE:
-        return f"{target.name} was cursed!"
+        return f"{target_string} was cursed!"
     elif status_effect == StatusEffect.CONFUSE:
-        return f"{target.name} was confused!"
+        return f"{target_string} was confused!"
     elif status_effect == StatusEffect.ATTRACT:
-        return f"{target.name} fell in love!"
+        return f"{target_string} fell in love!"
     elif status_effect == StatusEffect.FIRESPIN:
-        return f"{target.name} was surrounded by flames!"
+        return f"{target_string} was surrounded by flames!"
     elif status_effect == StatusEffect.WRAP:
-        return f"{target.name} was wrapped!"
+        return f"{target_string} was wrapped!"
     elif status_effect == StatusEffect.BIND:
-        return f"{target.name} was bound!"
+        return f"{target_string} was bound!"
     elif status_effect == StatusEffect.LEECHSEED:
-        return f"{target.name} was seeded!"
+        return f"{target_string} was seeded!"
     elif status_effect == StatusEffect.WHIRLPOOL:
-        return f"{target.name} was caught in the vortex!"
+        return f"{target_string} was caught in the vortex!"
 
 def status_desc(status_effect: StatusEffect) -> str:
     pass
